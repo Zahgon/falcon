@@ -118,17 +118,7 @@ class CompiledRouter:
         self._find = self._compile_and_find
         self._compile_lock = Lock()
 
-    @property
-    def options(self) -> CompiledRouterOptions:
-        return self._options
 
-    @property
-    def finder_src(self) -> str:
-        # NOTE(caselit): ensure that the router is actually compiled before
-        # returning the finder source, since the current value may be out of
-        # date
-        self.find('/')
-        return self._finder_src
 
     def map_http_methods(self, resource: object, **kwargs: Any) -> MethodDict:
         """Map HTTP methods (e.g., GET, POST) to methods of a resource object.
@@ -726,16 +716,7 @@ class CompiledRouter:
         This method must have the same signature as the function returned by the
         :meth:`.CompiledRouter._compile`.
         """
-        with self._compile_lock:
-            if self._find == self._compile_and_find:
-                # NOTE(caselit): replace the find with the result of the
-                # router compilation
-                self._find = self._compile()
-        # NOTE(caselit): return_values, patterns, converters are reset by the _compile
-        # method, so the updated ones must be used
-        return self._find(
-            path, self._return_values, self._patterns, self._converters, params
-        )
+        pass
 
 
 _NO_CHILDREN_ERR = (

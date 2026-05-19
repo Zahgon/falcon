@@ -131,42 +131,6 @@ def before(
             *action*.
     """
 
-    def _before(responder_or_resource: _R) -> _R:
-        if isinstance(responder_or_resource, type):
-            for responder_name, responder in getmembers(
-                responder_or_resource, callable
-            ):
-                if _DECORABLE_METHOD_NAME.match(responder_name):
-                    responder = cast('Responder', responder)
-                    do_before_all = _wrap_with_before(responder, action, args, kwargs)
-
-                    setattr(responder_or_resource, responder_name, do_before_all)
-
-                if _DECORABLE_ON_REQUEST_METHOD_NAME.match(responder_name):
-                    # Only wrap default responders if decorate_on_request is set to True
-                    if decorate_on_request:
-                        responder = cast('Responder', responder)
-                        do_before_all = _wrap_with_before(
-                            responder, action, args, kwargs
-                        )
-
-                        setattr(responder_or_resource, responder_name, do_before_all)
-                    else:
-                        warnings.warn(
-                            _ON_REQUEST_SKIPPED_WARNING.format(
-                                responder_name=responder_name,
-                                resource_name=responder_or_resource.__name__,
-                            ),
-                            UserWarning,
-                        )
-
-            return cast(_R, responder_or_resource)
-
-        else:
-            responder = cast('Responder', responder_or_resource)
-            do_before_one = _wrap_with_before(responder, action, args, kwargs)
-
-            return cast(_R, do_before_one)
 
     return _before
 
@@ -196,40 +160,6 @@ def after(
             *action*.
     """
 
-    def _after(responder_or_resource: _R) -> _R:
-        if isinstance(responder_or_resource, type):
-            for responder_name, responder in getmembers(
-                responder_or_resource, callable
-            ):
-                if _DECORABLE_METHOD_NAME.match(responder_name):
-                    responder = cast('Responder', responder)
-                    do_after_all = _wrap_with_after(responder, action, args, kwargs)
-
-                    setattr(responder_or_resource, responder_name, do_after_all)
-
-                if _DECORABLE_ON_REQUEST_METHOD_NAME.match(responder_name):
-                    # Only wrap default responders if decorate_on_request is set to True
-                    if decorate_on_request:
-                        responder = cast('Responder', responder)
-                        do_after_all = _wrap_with_after(responder, action, args, kwargs)
-
-                        setattr(responder_or_resource, responder_name, do_after_all)
-                    else:
-                        warnings.warn(
-                            _ON_REQUEST_SKIPPED_WARNING.format(
-                                responder_name=responder_name,
-                                resource_name=responder_or_resource.__name__,
-                            ),
-                            UserWarning,
-                        )
-
-            return cast(_R, responder_or_resource)
-
-        else:
-            responder = cast('Responder', responder_or_resource)
-            do_after_one = _wrap_with_after(responder, action, args, kwargs)
-
-            return cast(_R, do_after_one)
 
     return _after
 
@@ -265,38 +195,12 @@ def _wrap_with_after(
         )
         async_responder = cast('AsgiResponderMethod', responder)
 
-        @wraps(async_responder)
-        async def do_after(
-            self: Resource,
-            req: asgi.Request,
-            resp: asgi.Response,
-            *args: Any,
-            **kwargs: Any,
-        ) -> None:
-            if args:
-                _merge_responder_args(args, kwargs, extra_argnames)
-
-            await async_responder(self, req, resp, **kwargs)
-            await async_action(req, resp, self, *action_args, **action_kwargs)
 
         do_after_responder = cast('AsgiResponderMethod', do_after)
     else:
         sync_action = cast(Callable[..., None], action)
         sync_responder = cast('ResponderMethod', responder)
 
-        @wraps(sync_responder)
-        def do_after(
-            self: Resource,
-            req: wsgi.Request,
-            resp: wsgi.Response,
-            *args: Any,
-            **kwargs: Any,
-        ) -> None:
-            if args:
-                _merge_responder_args(args, kwargs, extra_argnames)
-
-            sync_responder(self, req, resp, **kwargs)
-            sync_action(req, resp, self, *action_args, **action_kwargs)
 
         do_after_responder = cast('ResponderMethod', do_after)
     return do_after_responder
@@ -328,38 +232,12 @@ def _wrap_with_before(
         )
         async_responder = cast('AsgiResponderMethod', responder)
 
-        @wraps(async_responder)
-        async def do_before(
-            self: Resource,
-            req: asgi.Request,
-            resp: asgi.Response,
-            *args: Any,
-            **kwargs: Any,
-        ) -> None:
-            if args:
-                _merge_responder_args(args, kwargs, extra_argnames)
-
-            await async_action(req, resp, self, kwargs, *action_args, **action_kwargs)
-            await async_responder(self, req, resp, **kwargs)
 
         do_before_responder = cast('AsgiResponderMethod', do_before)
     else:
         sync_action = cast(Callable[..., None], action)
         sync_responder = cast('ResponderMethod', responder)
 
-        @wraps(sync_responder)
-        def do_before(
-            self: Resource,
-            req: wsgi.Request,
-            resp: wsgi.Response,
-            *args: Any,
-            **kwargs: Any,
-        ) -> None:
-            if args:
-                _merge_responder_args(args, kwargs, extra_argnames)
-
-            sync_action(req, resp, self, kwargs, *action_args, **action_kwargs)
-            sync_responder(self, req, resp, **kwargs)
 
         do_before_responder = cast('ResponderMethod', do_before)
     return do_before_responder

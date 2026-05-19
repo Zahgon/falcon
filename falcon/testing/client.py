@@ -83,11 +83,7 @@ _T = TypeVar('_T', bound=Callable[..., Any])
 def _simulate_method_alias(
     method: _T, version_added: str = '3.1', replace_name: str | None = None
 ) -> _T:
-    def alias(client: Any, *args: Any, **kwargs: Any) -> Any:
-        return method(client, *args, **kwargs)
 
-    async def async_alias(client: Any, *args: Any, **kwargs: Any) -> Any:
-        return await method(client, *args, **kwargs)
 
     alias = async_alias if inspect.iscoroutinefunction(method) else alias
 
@@ -140,12 +136,12 @@ class Cookie:
     @property
     def name(self) -> str:
         """The cookie's name."""
-        return self._name
+        pass
 
     @property
     def value(self) -> str:
         """The value of the cookie."""
-        return self._value
+        pass
 
     @property
     def expires(self) -> dt.datetime | None:
@@ -155,10 +151,7 @@ class Cookie:
             This property now returns timezone-aware
             :class:`~datetime.datetime` objects (or ``None``).
         """
-        if self._expires:
-            return http_date_to_dt(self._expires, obs_date=True)
-
-        return None
+        pass
 
     @property
     def path(self) -> str:
@@ -166,7 +159,7 @@ class Cookie:
 
         An empty string if not specified.
         """
-        return self._path
+        pass
 
     @property
     def domain(self) -> str:
@@ -174,24 +167,24 @@ class Cookie:
 
         An empty string if not specified.
         """
-        return self._domain
+        pass
 
     @property
     def max_age(self) -> int | None:
         """The lifetime of the cookie in seconds, or ``None`` if not specified."""
-        return int(self._max_age) if self._max_age else None
+        pass
 
     @property
     def secure(self) -> bool:
         """Whether or not the cookie may only only be transmitted
         from the client via HTTPS.
         """  # noqa: D205
-        return bool(self._secure)
+        pass
 
     @property
     def http_only(self) -> bool:
         """Whether or not the cookie will be visible from JavaScript in the client."""
-        return bool(self._httponly)
+        pass
 
     @property
     def same_site(self) -> str | None:
@@ -199,12 +192,12 @@ class Cookie:
 
         Possible values are 'Lax', 'Strict' and 'None'. ``None`` if not specified.
         """
-        return self._samesite if self._samesite else None
+        pass
 
     @property
     def partitioned(self) -> bool:
         """Indicates if the cookie has the ``Partitioned`` flag set."""
-        return bool(self._partitioned)
+        pass
 
 
 class _ResultBase:
@@ -236,12 +229,12 @@ class _ResultBase:
     @property
     def status(self) -> str:
         """HTTP status string given in the response."""
-        return self._status
+        pass
 
     @property
     def status_code(self) -> int:
         """The code portion of the HTTP status string."""
-        return self._status_code
+        pass
 
     @property
     def headers(self) -> Headers:
@@ -254,7 +247,7 @@ class _ResultBase:
             currently not supported; it is unspecified which value
             will "win" and be represented in `headers`.
         """  # noqa: D205
-        return self._headers  # type: ignore[return-value]
+        pass
 
     @property
     def cookies(self) -> dict[str, Cookie]:
@@ -267,7 +260,7 @@ class _ResultBase:
             response_one = client.simulate_get('/')
             response_two = client.simulate_post('/', cookies=response_one.cookies)
         """  # noqa: D205
-        return self._cookies
+        pass
 
     @property
     def encoding(self) -> str | None:
@@ -275,12 +268,12 @@ class _ResultBase:
 
         Returns ``None`` if the encoding can not be determined.
         """
-        return self._encoding
+        pass
 
     @property
     def content_type(self) -> str | None:
         """Return the ``Content-Type`` header or ``None`` if missing."""
-        return self.headers.get('Content-Type')
+        pass
 
 
 class ResultBodyStream:
@@ -343,7 +336,7 @@ class Result(_ResultBase):
     @property
     def content(self) -> bytes:
         """Raw response body, or an ``b''`` if the response body was empty."""
-        return self._content
+        pass
 
     @property
     def text(self) -> str:
@@ -351,18 +344,7 @@ class Result(_ResultBase):
 
         If the content type does not specify an encoding, UTF-8 is assumed.
         """
-        if self._text is None:
-            if not self.content:
-                self._text = ''
-            else:
-                if self.encoding is None:
-                    encoding = 'UTF-8'
-                else:
-                    encoding = self.encoding
-
-                self._text = self.content.decode(encoding)
-
-        return self._text
+        pass
 
     @property
     def json(self) -> Any:
@@ -371,10 +353,7 @@ class Result(_ResultBase):
         Will be ``None`` if the body has no content to deserialize.
         Otherwise, raises an error if the response is not valid JSON.
         """
-        if not self.text:
-            return None
-
-        return json_module.loads(self.text)
+        pass
 
     def __repr__(self) -> str:
         repr_result = ' '.join(filter(None, self._prepare_repr_args()))
@@ -402,17 +381,6 @@ class Result(_ResultBase):
 
         return result_template.format(status_color, status, content_type, content)
 
-    def _prepare_repr_args(self) -> list[str]:
-        content_type = self.content_type or ''
-
-        if len(self.content) > 40:
-            content = self.content[:20] + b'...' + self.content[-20:]
-        else:
-            content = self.content
-
-        repr_args = [self.status, content_type, str(content)]
-
-        return repr_args
 
 
 class StreamedResult(_ResultBase):
@@ -452,7 +420,7 @@ class StreamedResult(_ResultBase):
     @property
     def stream(self) -> ResultBodyStream:
         """Raw response body, as a byte stream."""
-        return self._stream
+        pass
 
     async def finalize(self) -> None:
         """Finalize the encapsulated simulated request.
@@ -461,8 +429,7 @@ class StreamedResult(_ResultBase):
         ``'http.disconnect'`` events and then awaits the completion of the
         asyncio task that is running the simulated ASGI request.
         """
-        self._req_event_emitter.disconnect()
-        await self._task
+        pass
 
 
 # NOTE(kgriffs): The default of asgi_disconnect_ttl was chosen to be
@@ -1207,10 +1174,7 @@ class ASGIConductor:
                         pass
 
         """
-
-        kwargs['_stream_result'] = True
-
-        return _AsyncContextManager(self.simulate_request('GET', path, **kwargs))
+        pass
 
     def simulate_ws(self, path: str = '/', **kwargs: Any) -> _WSContextManager:
         """Simulate a WebSocket connection to an ASGI application.
@@ -1232,13 +1196,7 @@ class ASGIConductor:
                     message = await ws.receive_text()
 
         """
-
-        scope = helpers.create_scope_ws(path=path, **kwargs)
-        ws = helpers.ASGIWebSocketSimulator()
-
-        task_req = asyncio.create_task(self.app(scope, ws._emit, ws._collect))
-
-        return _WSContextManager(ws, task_req)
+        pass
 
     async def simulate_head(self, path: str = '/', **kwargs: Any) -> Result:
         """Simulate a HEAD request to an ASGI application.

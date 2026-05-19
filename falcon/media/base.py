@@ -84,7 +84,7 @@ class BaseHandler(metaclass=abc.ABCMeta):
         Returns:
             bytes: The resulting serialized bytes from the input object.
         """
-        return self.serialize(media, content_type)
+        pass
 
     def deserialize(
         self,

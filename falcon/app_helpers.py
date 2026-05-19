@@ -306,63 +306,7 @@ def default_serialize_error(req: Request, resp: Response, exception: HTTPError) 
         resp: Instance of ``falcon.Response``
         exception: Instance of ``falcon.HTTPError``
     """
-    options = resp.options
-    predefined = (
-        [MEDIA_JSON, 'text/xml', MEDIA_XML]
-        if options.xml_error_serialization
-        else [MEDIA_JSON]
-    )
-    media_handlers = [mt for mt in options.media_handlers if mt not in predefined]
-    # NOTE(caselit,vytas): Add the registered handlers after the predefined
-    #   ones. This ensures that in the case of an equal match, the first one
-    #   (JSON) is selected and that the q parameter is taken into consideration
-    #   when selecting the media handler.
-    preferred = req.client_prefers(predefined + media_handlers)
-
-    if preferred is None:
-        # NOTE(kgriffs): See if the client expects a custom media
-        # type based on something Falcon supports. Returning something
-        # is probably better than nothing, but if that is not
-        # desired, this behavior can be customized by adding a
-        # custom HTTPError serializer for the custom type.
-        accept = req.accept.lower()
-
-        # NOTE(kgriffs): Simple heuristic, but it's fast, and
-        # should be sufficiently accurate for our purposes. Does
-        # not take into account weights if both types are
-        # acceptable (simply chooses JSON). If it turns out we
-        # need to be more sophisticated, we can always change it
-        # later (YAGNI).
-        if '+json' in accept:
-            preferred = MEDIA_JSON
-        elif '+xml' in accept:
-            # NOTE(caselit): Ignore xml_error_serialization when
-            #   checking if the media should be XML. This gives a chance to
-            #   an XML media handler, if any, to be used.
-            preferred = MEDIA_XML
-
-    if preferred is not None:
-        handler, _, _ = options.media_handlers._resolve(
-            preferred, MEDIA_JSON, raise_not_found=False
-        )
-        if preferred == MEDIA_JSON:
-            # NOTE(caselit): Special case JSON to ensure that it's always
-            #   possible to serialize an error in JSON even if no JSON handler
-            #   is set in the media_handlers.
-            resp.data = exception.to_json(handler)
-        elif handler:
-            # NOTE(caselit): Let the app serialize the response even if it
-            #   needs to re-get the handler, since async handlers may not have
-            #   a sync version available.
-            resp.media = exception.to_dict()
-        elif options.xml_error_serialization:
-            resp.data = exception._to_xml()
-
-        # NOTE(kgriffs): No need to append the charset param, since
-        #   utf-8 is the default for both JSON and XML.
-        resp.content_type = preferred
-
-    resp.append_header('Vary', 'Accept')
+    pass
 
 
 class CloseableStreamIterator:

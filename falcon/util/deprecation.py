@@ -64,20 +64,6 @@ def deprecated(
 
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable[[Callable[..., Any]], Any]:
-        object_name = 'property' if is_property else 'function'
-        post_name = '' if is_property else '(...)'
-        message = 'Call to deprecated {} {}{}. {}'.format(
-            object_name, method_name or func.__name__, post_name, instructions
-        )
-
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Callable[..., Any]:
-            warnings.warn(message, category=DeprecatedWarning, stacklevel=2)
-
-            return cast(Callable[..., Any], func(*args, **kwargs))
-
-        return wrapper
 
     return decorator
 

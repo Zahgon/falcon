@@ -186,33 +186,27 @@ class BoundedStream:
 
     def isatty(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def readable(self) -> bool:
         """Return ``True`` always."""
-        return True
+        pass
 
     def seekable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def writable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def tell(self) -> int:
         """Return the number of bytes read from the stream so far."""
-        return self._pos
+        pass
 
-    @property
-    def closed(self) -> bool:
-        return self._closed
 
     # -------------------------------------------------------------------------
 
-    @property
-    def eof(self) -> bool:
-        return not self._buffer and self._bytes_remaining == 0
 
     def close(self) -> None:
         """Clear any buffered data and close this stream.
@@ -420,58 +414,3 @@ class BoundedStream:
 
         return data
 
-    async def _iter_content(self) -> AsyncIterator[bytes]:
-        if self._closed:
-            raise OperationNotAllowed(
-                'This stream is closed; no further operations on it are permitted.'
-            )
-
-        if self.eof:
-            return
-
-        if self._iteration_started:
-            raise OperationNotAllowed('This stream is already being iterated over.')
-
-        self._iteration_started = True
-
-        if self._buffer:
-            next_chunk = self._buffer
-            self._buffer = b''
-
-            self._pos += len(next_chunk)
-            yield next_chunk
-
-        while self._bytes_remaining > 0:
-            event = await self._receive()
-
-            # PERF(kgriffs): Use try...except because we normally expect the
-            #   'body' key to be present.
-            try:
-                next_chunk = event['body']
-            except KeyError:
-                pass
-            else:
-                # NOTE(kgriffs): No need to yield empty body chunks.
-                if next_chunk:
-                    next_chunk_len = len(next_chunk)
-
-                    if next_chunk_len <= self._bytes_remaining:
-                        self._bytes_remaining -= next_chunk_len
-                        self._pos += next_chunk_len
-                    else:
-                        # NOTE(kgriffs): We received more data than expected,
-                        #   so truncate to the expected length.
-                        next_chunk = next_chunk[: self._bytes_remaining]
-                        self._pos += self._bytes_remaining
-                        self._bytes_remaining = 0
-
-                    yield next_chunk
-
-            # NOTE(kgriffs): Per the ASGI spec, more_body is optional
-            #   and should be considered False if not present.
-            # NOTE(kgriffs): This also handles the case of receiving
-            #   the event: {'type': 'http.disconnect'}
-            # PERF(kgriffs): event.get() is more elegant, but uses a
-            #   few more CPU cycles.
-            if not ('more_body' in event and event['more_body']):
-                self._bytes_remaining = 0

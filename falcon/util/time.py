@@ -45,8 +45,7 @@ class TimezoneGMT(datetime.tzinfo):
             datetime.timedelta: GMT offset, which is equivalent to UTC and
             so is always 0.
         """
-
-        return self.GMT_ZERO
+        pass
 
     def tzname(self, dt: datetime.datetime | None) -> str:
         """Get the name of this timezone.
@@ -57,8 +56,7 @@ class TimezoneGMT(datetime.tzinfo):
         Returns:
             str: "GMT"
         """
-
-        return 'GMT'
+        pass
 
     def dst(self, dt: datetime.datetime | None) -> datetime.timedelta:
         """Return the daylight saving time (DST) adjustment.
@@ -69,5 +67,4 @@ class TimezoneGMT(datetime.tzinfo):
         Returns:
             datetime.timedelta: DST adjustment for GMT, which is always 0.
         """
-
-        return self.GMT_ZERO
+        pass

@@ -43,36 +43,13 @@ def _header_property(
     """
     normalized_name = name.lower()
 
-    def fget(self: Response) -> str | None:
-        try:
-            return self._headers[normalized_name]
-        except KeyError:
-            return None
 
     if transform is None:
 
-        def fset(self: Response, value: Any | None) -> None:
-            if value is None:
-                try:
-                    del self._headers[normalized_name]
-                except KeyError:
-                    pass
-            else:
-                self._headers[normalized_name] = str(value)
 
     else:
 
-        def fset(self: Response, value: Any | None) -> None:
-            if value is None:
-                try:
-                    del self._headers[normalized_name]
-                except KeyError:
-                    pass
-            else:
-                self._headers[normalized_name] = transform(value)
 
-    def fdel(self: Response) -> None:
-        del self._headers[normalized_name]
 
     return property(fget, fset, fdel, doc)
 

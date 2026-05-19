@@ -281,8 +281,5 @@ def runs_sync(coroutine: Callable[..., Awaitable[Result]]) -> Callable[..., Resu
         callable: A synchronous function.
     """
 
-    @wraps(coroutine)
-    def invoke(*args: Any, **kwargs: Any) -> Any:
-        return async_to_sync(coroutine, *args, **kwargs)
 
     return invoke

@@ -217,7 +217,7 @@ class SimpleTestResource:
     @property
     def called(self) -> bool:
         """Whether or not a req/resp was captured."""
-        return self.captured_req is not None
+        pass
 
     @falcon.before(capture_responder_args)
     @falcon.before(set_resp_defaults)

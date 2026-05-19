@@ -75,8 +75,6 @@ class MessagePackHandler(BaseHandler):
     def serialize(self, media: Any, content_type: str | None) -> bytes:
         return self._pack(media)
 
-    async def serialize_async(self, media: Any, content_type: str | None) -> bytes:
-        return self._pack(media)
 
 
 class MessagePackHandlerWS(BinaryBaseHandlerWS):

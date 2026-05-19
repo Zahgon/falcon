@@ -85,12 +85,6 @@ def load_app(parser, args):
 
 
 # TODO(vytas): Remove this placeholder altogether in Falcon 5.0.
-def route_main():
-    sys.stderr.write(
-        'The "falcon-print-routes" command is no longer supported. \n\n'
-        'Please use "falcon-inspect-app" instead.\n\n'
-    )
-    sys.exit(2)
 
 
 def main():

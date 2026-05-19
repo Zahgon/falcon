@@ -135,13 +135,7 @@ class BodyPart:
         Returns:
             bytes: The body part content.
         """
-        if self._data is None:
-            max_size = self._parse_options.max_body_part_buffer_size + 1
-            self._data = self.stream.read(max_size)
-            if len(self._data) >= max_size:
-                raise MultipartParseError(description='body part is too large')
-
-        return self._data
+        pass
 
     def get_text(self) -> str | None:
         """Return the body part content decoded as a text string.
@@ -168,17 +162,7 @@ class BodyPart:
             str: The part decoded as a text string provided the part is
             encoded as ``text/plain``, ``None`` otherwise.
         """
-        content_type, options = parse_header(self.content_type)
-        if content_type != 'text/plain':
-            return None
-
-        charset = options.get('charset', self._parse_options.default_charset)
-        try:
-            return self.data.decode(charset)
-        except (ValueError, LookupError) as err:
-            raise MultipartParseError(
-                description='invalid text or charset: {}'.format(charset)
-            ) from err
+        pass
 
     @property
     def content_type(self) -> str:
@@ -186,37 +170,12 @@ class BodyPart:
 
         When the header is missing returns the multipart form default ``text/plain``.
         """
-        # NOTE(vytas): RFC 7578, section 4.4.
-        #   Each part MAY have an (optional) "Content-Type" header field, which
-        #   defaults to "text/plain".
-        value = self._headers.get(b'content-type', b'text/plain')
-        return value.decode('ascii')
+        pass
 
     @property
     def filename(self) -> str | None:
         """File name if the body part is an attached file, and ``None`` otherwise."""
-        if self._filename is _UNSET:
-            if self._content_disposition is None:
-                value = self._headers.get(b'content-disposition', b'')
-                self._content_disposition = parse_header(value.decode())
-
-            _, params = self._content_disposition
-
-            # NOTE(vytas): Supporting filename* as per RFC 5987, as that has
-            #   been spotted in the wild, even though RFC 7578 forbids it.
-            match = _FILENAME_STAR_RFC5987.match(params.get('filename*', ''))
-            if match:
-                charset, filename_raw = match.groups()
-                try:
-                    self._filename = unquote_to_bytes(filename_raw).decode(charset)
-                except (ValueError, LookupError) as err:
-                    raise MultipartParseError(
-                        description='invalid text or charset: {}'.format(charset)
-                    ) from err
-            else:
-                self._filename = params.get('filename')
-
-        return self._filename
+        pass
 
     @property
     def secure_filename(self) -> str:
@@ -253,15 +212,7 @@ class BodyPart:
             However, Falcon will not raise any error if this parameter is
             missing; the property value will be ``None`` in that case.
         """
-        if self._name is _UNSET:
-            if self._content_disposition is None:
-                value = self._headers.get(b'content-disposition', b'')
-                self._content_disposition = parse_header(value.decode())
-
-            _, params = self._content_disposition
-            self._name = params.get('name')
-
-        return self._name
+        pass
 
     def get_media(self) -> Any:
         """Return a deserialized form of the multipart body part.

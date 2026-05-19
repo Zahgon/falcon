@@ -77,14 +77,6 @@ class BodyPart(multipart.BodyPart):
             pass
     """
 
-    async def get_data(self) -> bytes:  # type: ignore[override]
-        if self._data is None:
-            max_size = self._parse_options.max_body_part_buffer_size + 1
-            self._data = await self.stream.read(max_size)
-            if len(self._data) >= max_size:
-                raise MultipartParseError(description='body part is too large')
-
-        return self._data
 
     async def get_media(self) -> Any:
         """Return a deserialized form of the multipart body part.
@@ -115,18 +107,6 @@ class BodyPart(multipart.BodyPart):
 
         return self._media
 
-    async def get_text(self) -> str | None:  # type: ignore[override]
-        content_type, options = parse_header(self.content_type)
-        if content_type != 'text/plain':
-            return None
-
-        charset = options.get('charset', self._parse_options.default_charset)
-        try:
-            return (await self.get_data()).decode(charset)
-        except (ValueError, LookupError) as err:
-            raise MultipartParseError(
-                description='invalid text or charset: {}'.format(charset)
-            ) from err
 
     data: Awaitable[bytes] = property(get_data)  # type: ignore[assignment]
     """Property that acts as a convenience alias for :meth:`~.get_data`.
@@ -197,87 +177,3 @@ class MultipartForm:
     def __aiter__(self) -> AsyncIterator[BodyPart]:
         return self._iterate_parts()
 
-    async def _iterate_parts(self) -> AsyncIterator[BodyPart]:
-        prologue = True
-        delimiter = self._dash_boundary
-        stream = self._stream
-        max_headers_size = self._parse_options.max_body_part_headers_size
-        remaining_parts = self._parse_options.max_body_part_count
-
-        while True:
-            # NOTE(vytas): Either exhaust the unused stream part, or skip
-            #   the prologue.
-            try:
-                await stream.pipe_until(delimiter, consume_delimiter=True)
-
-                if prologue:
-                    # NOTE(vytas): RFC 7578, section 4.1.
-                    #   As with other multipart types, the parts are delimited
-                    #   with a boundary delimiter, constructed using CRLF,
-                    #   "--", and the value of the "boundary" parameter.
-                    delimiter = _CRLF + delimiter
-                    prologue = False
-
-                # NOTE(vytas): Interpretations of RFC 2046, Appendix A, vary
-                #   as to whether the closing `--` must be followed by CRLF.
-                #   While the absolute majority of HTTP clients and browsers
-                #   do append it as a common convention, it seems that this is
-                #   not mandated by the RFC, so we do not require it either.
-                # NOTE(vytas): Certain versions of the Undici client
-                #   (Node's fetch implementation) do not follow the convention.
-                if await stream.peek(2) == b'--':
-                    # NOTE(vytas): boundary delimiter + '--' signals the end of
-                    #   a multipart form.
-                    await stream.read(2)
-                    break
-
-                await stream.read_until(_CRLF, 0, consume_delimiter=True)
-
-            except DelimiterError as err:
-                raise MultipartParseError(
-                    description='unexpected form structure'
-                ) from err
-
-            headers = {}
-            try:
-                headers_block = await stream.read_until(
-                    _CRLF_CRLF, max_headers_size, consume_delimiter=True
-                )
-            except DelimiterError as err:
-                raise MultipartParseError(
-                    description='incomplete body part headers'
-                ) from err
-
-            for line in headers_block.split(_CRLF):
-                name, sep, value = line.partition(b': ')
-                if sep:
-                    name = name.lower()
-
-                    # NOTE(vytas): RFC 7578, section 4.5.
-                    #   This use is deprecated for use in contexts that support
-                    #   binary data such as HTTP. Senders SHOULD NOT generate
-                    #   any parts with a Content-Transfer-Encoding header
-                    #   field.
-                    #
-                    #   Currently, no deployed implementations that send such
-                    #   bodies have been discovered.
-                    if name == b'content-transfer-encoding' and value != b'binary':
-                        raise MultipartParseError(
-                            description=(
-                                'the deprecated Content-Transfer-Encoding '
-                                'header field is unsupported'
-                            )
-                        )
-                    # NOTE(vytas): RFC 7578, section 4.8.
-                    #   Other header fields MUST NOT be included and MUST be
-                    #   ignored.
-                    elif name in _ALLOWED_CONTENT_HEADERS:
-                        headers[name] = value
-
-            remaining_parts -= 1
-            if remaining_parts < 0 < self._parse_options.max_body_part_count:
-                raise MultipartParseError(
-                    description='maximum number of form body parts exceeded'
-                )
-
-            yield BodyPart(stream.delimit(delimiter), headers, self._parse_options)

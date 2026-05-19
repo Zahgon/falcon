@@ -2612,12 +2612,6 @@ class MediaMalformedError(HTTPBadRequest):
         )
         self._media_type = media_type
 
-    @property
-    def description(self) -> str | None:
-        msg = 'Could not parse {} body'.format(self._media_type)
-        if self.__cause__ is not None:
-            msg += ' - {}'.format(self.__cause__)
-        return msg
 
     @description.setter
     def description(self, value: str | None) -> None:
@@ -2726,11 +2720,7 @@ class MultipartParseError(MediaMalformedError):
 
 def _load_headers(headers: HeaderArg | None) -> Headers:
     """Transform the headers to dict."""
-    if headers is None:
-        return {}
-    if isinstance(headers, dict):
-        return headers
-    return dict(headers)
+    pass
 
 
 def _parse_retry_after(
@@ -2738,11 +2728,4 @@ def _parse_retry_after(
     retry_after: RetryAfter,
 ) -> HeaderArg | None:
     """Set the Retry-After to the headers when required."""
-    if retry_after is None:
-        return headers
-    headers = _load_headers(headers)
-    if isinstance(retry_after, datetime):
-        headers['Retry-After'] = dt_to_http(retry_after)
-    else:
-        headers['Retry-After'] = str(retry_after)
-    return headers
+    pass

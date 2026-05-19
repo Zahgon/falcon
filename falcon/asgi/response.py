@@ -136,11 +136,8 @@ class Response(response.Response):
             server should be set with a relatively long keep-alive TTL to
             minimize the overhead of connection renegotiations.
         """  # noqa: D400 D205
-        return self._sse
+        pass
 
-    @sse.setter
-    def sse(self, value: SSEEmitter | None) -> None:
-        self._sse = value
 
     def set_stream(
         self,
@@ -170,12 +167,7 @@ class Response(response.Response):
             content_length (int): Length of the stream, used for the
                 Content-Length header in the response.
         """
-
-        self.stream = stream
-
-        # PERF(kgriffs): Set directly rather than incur the overhead of
-        #   the self.content_length property.
-        self._headers['content-length'] = str(content_length)
+        pass
 
     async def render_body(self) -> bytes | None:  # type: ignore[override]
         """Get the raw bytestring content for the response body.
@@ -194,42 +186,7 @@ class Response(response.Response):
             finally the serialized value of the `media` attribute. If
             none of these attributes are set, ``None`` is returned.
         """
-
-        # NOTE(vytas): The code below is also inlined in asgi.App.__call__.
-
-        data: bytes | None
-        text = self.text
-        if text is None:
-            data = self._data
-
-            if data is None and self._media is not None:
-                # NOTE(kgriffs): We use a special _UNSET singleton since
-                #   None is ambiguous (the media handler might return None).
-                if self._media_rendered is _UNSET:
-                    if not self.content_type:
-                        self.content_type = self.options.default_media_type
-
-                    handler, serialize_sync, _ = self.options.media_handlers._resolve(
-                        self.content_type, self.options.default_media_type
-                    )
-
-                    if serialize_sync:
-                        self._media_rendered = serialize_sync(self._media)
-                    else:
-                        self._media_rendered = await handler.serialize_async(
-                            self._media, self.content_type
-                        )
-
-                data = self._media_rendered
-        else:
-            try:
-                # NOTE(kgriffs): Normally we expect text to be a string
-                data = text.encode()
-            except AttributeError:
-                # NOTE(kgriffs): Assume it was a bytes object already
-                data = text  # type: ignore[assignment]
-
-        return data
+        pass
 
     def schedule(self, callback: Callable[[], Awaitable[None]]) -> None:
         """Schedule an async callback to run soon after sending the HTTP response.
@@ -262,28 +219,7 @@ class Response(response.Response):
             callback(object): An async coroutine function. The callback will be
                 invoked without arguments.
         """
-
-        if not iscoroutinefunction(callback):
-            if iscoroutine(callback):
-                raise TypeError(
-                    'The callback object appears to '
-                    'be a coroutine, rather than a coroutine function. Please '
-                    'pass the function itself, rather than the result obtained '
-                    'by calling the function. '
-                )
-            elif is_python_func(callback):  # pragma: nocover
-                raise TypeError('The callback must be a coroutine function.')
-
-            # NOTE(kgriffs): The implicit "else" branch is actually covered
-            #   by tests running in a Cython environment, but we can't
-            #   detect it with the coverage tool.
-
-        rc: tuple[Callable[[], Awaitable[None]], Literal[True]] = (callback, True)
-
-        if not self._registered_callbacks:
-            self._registered_callbacks = [rc]
-        else:
-            self._registered_callbacks.append(rc)
+        pass
 
     def schedule_sync(self, callback: Callable[[], None]) -> None:
         """Schedule a synchronous callback to run soon after sending the HTTP response.
@@ -323,13 +259,7 @@ class Response(response.Response):
             callback(object): An async coroutine function or a synchronous
                 callable. The callback will be called without arguments.
         """
-
-        rc: tuple[Callable[[], None], Literal[False]] = (callback, False)
-
-        if not self._registered_callbacks:
-            self._registered_callbacks = [rc]
-        else:
-            self._registered_callbacks.append(rc)
+        pass
 
     # ------------------------------------------------------------------------
     # Helper methods
@@ -348,49 +278,4 @@ class Response(response.Response):
                 header if the header was not set explicitly (default ``None``).
 
         """
-
-        headers = self._headers
-        # PERF(vytas): uglier inline version of Response._set_media_type
-        if media_type is not None and 'content-type' not in headers:
-            headers['content-type'] = media_type
-
-        try:
-            # NOTE(vytas): Supporting ISO-8859-1 for historical reasons as per
-            #   RFC 7230, Section 3.2.4; and to strive for maximum
-            #   compatibility with WSGI.
-
-            # PERF(vytas): On CPython, _encode_items_to_latin1 is implemented
-            #   in Cython (with a pure Python fallback), where the resulting
-            #   C code speeds up the method substantially by directly invoking
-            #   CPython's C API functions such as PyUnicode_EncodeLatin1.
-            items = _encode_items_to_latin1(headers)
-        except UnicodeEncodeError as ex:
-            # TODO(vytas): In 3.1.0, update this error message to highlight the
-            #   fact that we decided to allow ISO-8859-1?
-            raise ValueError(
-                'The modern series of HTTP standards require that header '
-                f'names and values use only ASCII characters: {ex}'
-            )
-
-        if self._extra_headers:
-            items += [
-                (n.encode('ascii'), v.encode('ascii')) for n, v in self._extra_headers
-            ]
-
-        # NOTE(kgriffs): It is important to append these after self._extra_headers
-        #   in case the latter contains Set-Cookie headers that should be
-        #   overridden by a call to unset_cookie().
-        if self._cookies is not None:
-            # PERF(tbug):
-            # The below implementation is ~23% faster than
-            # the alternative:
-            #
-            #     self._cookies.output().split("\\r\\n")
-            #
-            # Even without the .split("\\r\\n"), the below
-            # is still ~17% faster, so don't use .output()
-            items += [
-                (b'set-cookie', c.OutputString().encode('ascii'))
-                for c in self._cookies.values()
-            ]
-        return items
+        pass

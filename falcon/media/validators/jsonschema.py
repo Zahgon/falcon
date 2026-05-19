@@ -84,11 +84,6 @@ def validate(
 
     """
 
-    def decorator(func: ResponderMethod) -> ResponderMethod:
-        if iscoroutinefunction(func):
-            return _validate_async(func, req_schema, resp_schema)
-
-        return _validate(func, req_schema, resp_schema)
 
     return decorator
 

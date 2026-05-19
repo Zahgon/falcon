@@ -101,17 +101,6 @@ utcnow: Callable[[], datetime.datetime] = deprecated(
 # NOTE(kgriffs,vytas): This is tested in the PyPy gate but we do not want devs
 #   to have to install PyPy to check coverage on their workstations, so we use
 #   the nocover pragma here.
-def _lru_cache_nop(
-    maxsize: int,
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:  # pragma: nocover
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        # NOTE(kgriffs): Partially emulate the lru_cache protocol; only add
-        #   cache_info() later if/when it becomes necessary.
-        func.cache_clear = lambda: None  # type: ignore
-
-        return func
-
-    return decorator
 
 
 # PERF(kgriffs): Using lru_cache is slower on PyPy when the wrapped

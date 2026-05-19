@@ -199,12 +199,8 @@ class Response:
             if resp.status_code >= 400:
                 log.warning(f'returning error response: {resp.status_code}')
         """
-        # TODO(0xMattB): Modify decorator to return proper type (see gh #2629).
-        return http_status_to_code(self.status)  # type: ignore[no-any-return]
+        pass
 
-    @status_code.setter
-    def status_code(self, value: int) -> None:
-        self.status = value
 
     @property
     def body(self) -> NoReturn:
@@ -233,11 +229,8 @@ class Response:
             ensure Unicode characters are properly encoded in the
             HTTP response.
         """
-        return self._data
+        pass
 
-    @data.setter
-    def data(self, value: bytes | None) -> None:
-        self._data = value
 
     @property
     def headers(self) -> Headers:
@@ -246,7 +239,7 @@ class Response:
         Note that a new copy is created and returned each time this property is
         referenced.
         """
-        return self._headers.copy()
+        pass
 
     @property
     def media(self) -> Any:
@@ -281,36 +274,7 @@ class Response:
             finally the serialized value of the `media` attribute. If
             none of these attributes are set, ``None`` is returned.
         """
-        data: bytes | None
-        text = self.text
-        if text is None:
-            data = self._data
-
-            if data is None and self._media is not None:
-                # NOTE(kgriffs): We use a special _UNSET singleton since
-                #   None is ambiguous (the media handler might return None).
-                if self._media_rendered is _UNSET:
-                    if not self.content_type:
-                        self.content_type = self.options.default_media_type
-
-                    handler, _, _ = self.options.media_handlers._resolve(
-                        self.content_type, self.options.default_media_type
-                    )
-
-                    self._media_rendered = handler.serialize(
-                        self._media, self.content_type
-                    )
-
-                data = self._media_rendered
-        else:
-            try:
-                # NOTE(kgriffs): Normally we expect text to be a string
-                data = text.encode()
-            except AttributeError:
-                # NOTE(kgriffs): Assume it was a bytes object already
-                data = text  # type: ignore[assignment]
-
-        return data
+        pass
 
     def __repr__(self) -> str:
         return f'<{self.__class__.__name__}: {self.status}>'
@@ -340,12 +304,7 @@ class Response:
             content_length (int): Length of the stream, used for the
                 Content-Length header in the response.
         """
-
-        self.stream = stream
-
-        # PERF(kgriffs): Set directly rather than incur the overhead of
-        #   the self.content_length property.
-        self._headers['content-length'] = str(content_length)
+        pass
 
     def set_cookie(  # noqa: C901
         self,
@@ -484,78 +443,7 @@ class Response:
             https://developer.mozilla.org/en-US/docs/Web/Privacy/Privacy_sandbox/Partitioned_cookies
 
         """
-
-        if not _is_ascii_encodable(name):
-            raise KeyError('name is not ASCII encodable')
-        if not _is_ascii_encodable(value):
-            raise ValueError('value is not ASCII encodable')
-
-        value = str(value)
-
-        if self._cookies is None:
-            self._cookies = http_cookies.SimpleCookie()
-
-        try:
-            self._cookies[name] = value
-        except http_cookies.CookieError as e:  # pragma: no cover
-            # NOTE(tbug): we raise a KeyError here, to avoid leaking
-            # the CookieError to the user. SimpleCookie (well, BaseCookie)
-            # only throws CookieError on issues with the cookie key
-            raise KeyError(str(e))
-
-        if expires:
-            # set Expires on cookie. Format is Wdy, DD Mon YYYY HH:MM:SS GMT
-
-            # NOTE(tbug): we never actually need to
-            # know that GMT is named GMT when formatting cookies.
-            # It is a function call less to just write "GMT" in the fmt string:
-            fmt = '%a, %d %b %Y %H:%M:%S GMT'
-            if expires.tzinfo is None:
-                # naive
-                self._cookies[name]['expires'] = expires.strftime(fmt)
-            else:
-                # aware
-                gmt_expires = expires.astimezone(timezone.utc)
-                self._cookies[name]['expires'] = gmt_expires.strftime(fmt)
-
-        if max_age:
-            # RFC 6265 section 5.2.2 says about the max-age value:
-            #   "If the remainder of attribute-value contains a non-DIGIT
-            #    character, ignore the cookie-av."
-            # That is, RFC-compliant response parsers will ignore the max-age
-            # attribute if the value contains a dot, as in floating point
-            # numbers. Therefore, attempt to convert the value to an integer.
-            self._cookies[name]['max-age'] = int(max_age)
-
-        if domain:
-            self._cookies[name]['domain'] = domain
-
-        if path:
-            self._cookies[name]['path'] = path
-
-        is_secure = self.options.secure_cookies_by_default if secure is None else secure
-
-        if is_secure:
-            self._cookies[name]['secure'] = True
-
-        if http_only:
-            self._cookies[name]['httponly'] = http_only
-
-        # PERF(kgriffs): Morsel.__setitem__() will lowercase this anyway,
-        #   so we can just pass this in and when __setitem__() calls
-        #   lower() it will be very slightly faster.
-        if same_site:
-            same_site = same_site.lower()
-
-            if same_site not in _RESERVED_SAMESITE_VALUES:
-                raise ValueError(
-                    "same_site must be set to either 'lax', 'strict', or 'none'"
-                )
-
-            self._cookies[name]['samesite'] = same_site.capitalize()
-
-        if partitioned:
-            self._cookies[name]['partitioned'] = True
+        pass
 
     def unset_cookie(
         self,
@@ -625,40 +513,7 @@ class Response:
         .. _Same-Site warnings:
             https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite#Fixing_common_warnings
         """  # noqa: E501
-        if self._cookies is None:
-            self._cookies = http_cookies.SimpleCookie()
-
-        self._cookies[name] = ''
-
-        # NOTE(Freezerburn): SimpleCookie apparently special cases the
-        # expires attribute to automatically use strftime and set the
-        # time as a delta from the current time. We use -1 here to
-        # basically tell the browser to immediately expire the cookie,
-        # thus removing it from future request objects.
-        self._cookies[name]['expires'] = -1
-
-        # Handle deprecated samesite parameter
-        if samesite is not None:
-            warnings.warn(
-                'The "samesite" parameter is deprecated. '
-                'Please use "same_site" instead.',
-                DeprecatedWarning,
-                stacklevel=2,
-            )
-            # Use the deprecated parameter value if same_site was not explicitly set
-            same_site_value = samesite
-        else:
-            same_site_value = same_site
-
-        # NOTE(CaselIT): Set SameSite to Lax to avoid setting invalid cookies.
-        # See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite#Fixing_common_warnings  # noqa: E501
-        self._cookies[name]['samesite'] = same_site_value
-
-        if domain:
-            self._cookies[name]['domain'] = domain
-
-        if path:
-            self._cookies[name]['path'] = path
+        pass
 
     @overload
     def get_header(self, name: str, default: str) -> str: ...
@@ -759,14 +614,7 @@ class Response:
         Raises:
             ValueError: `name` cannot be ``'Set-Cookie'``.
         """
-
-        # NOTE(kgriffs): normalize name by lowercasing it
-        name = name.lower()
-
-        if name == 'set-cookie':
-            raise HeaderNotSupported('This method cannot be used to remove cookies')
-
-        self._headers.pop(name, None)
+        pass
 
     def append_header(self, name: str, value: str) -> None:
         """Set or append a header for this response.
@@ -787,26 +635,7 @@ class Response:
             value (str): Value for the header. As with the header's name, the
                 value may contain only US-ASCII characters.
         """
-
-        # NOTE(kgriffs): uwsgi fails with a TypeError if any header
-        # is not a str, so do the conversion here. It's actually
-        # faster to not do an isinstance check. str() will encode
-        # to US-ASCII.
-        value = str(value)
-
-        # NOTE(kgriffs): normalize name by lowercasing it
-        name = name.lower()
-
-        if name == 'set-cookie':
-            if not self._extra_headers:
-                self._extra_headers = [(name, value)]
-            else:
-                self._extra_headers.append((name, value))
-        else:
-            if name in self._headers:
-                value = self._headers[name] + ', ' + value
-
-            self._headers[name] = value
+        pass
 
     def set_headers(
         self, headers: Mapping[str, str] | Iterable[tuple[str, str]]
@@ -938,69 +767,7 @@ class Response:
                 must be a two-tuple in the form of (*param*, *value*).
 
         """
-
-        # PERF(kgriffs): Heuristic to detect possibility of an extension
-        # relation type, in which case it will be a URL that may contain
-        # reserved characters. Otherwise, don't waste time running the
-        # string through uri.encode
-        #
-        # Example values for rel:
-        #
-        #     "next"
-        #     "http://example.com/ext-type"
-        #     "https://example.com/ext-type"
-        #     "alternate http://example.com/ext-type"
-        #     "http://example.com/ext-type alternate"
-        #
-        if '//' in rel:
-            if ' ' in rel:
-                rel = '"' + ' '.join([uri_encode(r) for r in rel.split()]) + '"'
-            else:
-                rel = f'"{uri_encode(rel)}"'
-
-        value = '<' + uri_encode(target) + '>; rel=' + rel
-
-        if title is not None:
-            value += f'; title="{title}"'
-
-        if title_star is not None:
-            value += f"; title*=UTF-8'{title_star[0]}'{uri_encode_value(title_star[1])}"
-
-        if type_hint is not None:
-            value += f'; type="{type_hint}"'
-
-        if hreflang is not None:
-            if isinstance(hreflang, str):
-                value += f'; hreflang={hreflang}'
-            else:
-                value += '; '
-                value += '; '.join(['hreflang=' + lang for lang in hreflang])
-
-        if anchor is not None:
-            value += f'; anchor="{uri_encode(anchor)}"'
-
-        if crossorigin is not None:
-            crossorigin = crossorigin.lower()
-            if crossorigin not in _RESERVED_CROSSORIGIN_VALUES:
-                raise ValueError(
-                    "crossorigin must be set to either 'anonymous' or 'use-credentials'"
-                )
-            if crossorigin == 'anonymous':
-                value += '; crossorigin'
-            else:  # crossorigin == 'use-credentials'
-                # PERF(vytas): the only remaining value is inlined.
-                # Un-inline in case more values are supported in the future.
-                value += '; crossorigin="use-credentials"'
-
-        if link_extension is not None:
-            value += '; '
-            value += '; '.join([f'{p}={v}' for p, v in link_extension])
-
-        _headers = self._headers
-        if 'link' in _headers:
-            _headers['link'] += f', {value}'
-        else:
-            _headers['link'] = value
+        pass
 
     @property
     def add_link(self) -> NoReturn:
@@ -1353,12 +1120,7 @@ class Response:
                 header.
 
         """
-
-        # PERF(kgriffs): Using "in" like this is faster than dict.setdefault()
-        #   in most cases, except on PyPy where it is only a fraction of a
-        #   nanosecond slower. Last tested on Python versions 3.5-3.7.
-        if media_type is not None and 'content-type' not in self._headers:
-            self._headers['content-type'] = media_type
+        pass
 
     def _wsgi_headers(self, media_type: str | None = None) -> list[tuple[str, str]]:
         """Convert headers into the format expected by WSGI servers.
@@ -1368,31 +1130,7 @@ class Response:
                 header if the header was not set explicitly (default ``None``).
 
         """
-
-        headers = self._headers
-        # PERF(vytas): uglier inline version of Response._set_media_type
-        if media_type is not None and 'content-type' not in headers:
-            headers['content-type'] = media_type
-
-        items = list(headers.items())
-
-        if self._extra_headers:
-            items += self._extra_headers
-
-        # NOTE(kgriffs): It is important to append these after self._extra_headers
-        #   in case the latter contains Set-Cookie headers that should be
-        #   overridden by a call to unset_cookie().
-        if self._cookies is not None:
-            # PERF(tbug):
-            # The below implementation is ~23% faster than
-            # the alternative:
-            #
-            #     self._cookies.output().split("\\r\\n")
-            #
-            # Even without the .split("\\r\\n"), the below
-            # is still ~17% faster, so don't use .output()
-            items += [('set-cookie', c.OutputString()) for c in self._cookies.values()]
-        return items
+        pass
 
 
 class ResponseOptions:

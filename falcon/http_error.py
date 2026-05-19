@@ -161,8 +161,7 @@ class HTTPError(Exception):
         """HTTP status code normalized from the ``status`` argument passed
         to the initializer.
         """  # noqa: D205
-        # TODO(0xMattB): Modify decorator to return proper type (see gh #2629).
-        return misc.http_status_to_code(self.status)  # type: ignore[no-any-return]
+        pass
 
     def to_dict(
         self, obj_type: type[MutableMapping[str, str | int | None | Link]] = dict
@@ -181,21 +180,7 @@ class HTTPError(Exception):
             description, etc.
 
         """
-
-        obj = obj_type()
-
-        obj['title'] = self.title
-
-        if self.description is not None:
-            obj['description'] = self.description
-
-        if self.code is not None:
-            obj['code'] = self.code
-
-        if self.link is not None:
-            obj['link'] = self.link
-
-        return obj
+        pass
 
     def to_json(self, handler: BaseHandler | None = None) -> bytes:
         """Return a JSON representation of the error.
@@ -209,35 +194,11 @@ class HTTPError(Exception):
             bytes: A JSON document for the error.
 
         """
-
-        obj = self.to_dict()
-        if handler is None:
-            handler = _DEFAULT_JSON_HANDLER
-        # NOTE: the json handler requires the sync serialize interface
-        return handler.serialize(obj, MEDIA_JSON)
+        pass
 
     def _to_xml(self) -> bytes:
         """Return an XML-encoded representation of the error."""
-
-        error_element = et.Element('error')
-
-        et.SubElement(error_element, 'title').text = self.title
-
-        if self.description is not None:
-            et.SubElement(error_element, 'description').text = self.description
-
-        if self.code is not None:
-            et.SubElement(error_element, 'code').text = str(self.code)
-
-        if self.link is not None:
-            link_element = et.SubElement(error_element, 'link')
-
-            for key in ('text', 'href', 'rel'):
-                et.SubElement(link_element, key).text = self.link[key]
-
-        return b'<?xml version="1.0" encoding="UTF-8"?>' + et.tostring(  # type: ignore[no-any-return]
-            error_element, encoding='utf-8'
-        )
+        pass
 
     @deprecation.deprecated(
         'The internal error serialization to XML is deprecated. '
@@ -253,7 +214,7 @@ class HTTPError(Exception):
             Automatic error serialization to XML is deprecated.
             Please serialize the output of :meth:`to_dict` to XML instead.
         """
-        return self._to_xml()
+        pass
 
 
 # NOTE: initialized in falcon.media.json, that is always imported since Request/Response

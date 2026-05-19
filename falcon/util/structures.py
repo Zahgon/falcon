@@ -96,7 +96,7 @@ class CaseInsensitiveDict(MutableMapping[str, tuple[str, Any]]):  # pragma: no c
 
     def lower_items(self) -> Iterator[tuple[str, Any]]:
         """Like iteritems(), but with all lowercase keys."""
-        return ((lowerkey, keyval[1]) for (lowerkey, keyval) in self._store.items())
+        pass
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Mapping):
@@ -199,8 +199,6 @@ class Context:
     def __str__(self) -> str:
         return '{}({})'.format(type(self).__name__, self.__dict__.__str__())
 
-    def clear(self) -> None:
-        return self.__dict__.clear()
 
     def copy(self) -> Context:
         ctx = type(self)()
@@ -219,8 +217,6 @@ class Context:
     def pop(self, key: str, default: Any | None = None) -> Any | None:
         return self.__dict__.pop(key, default)
 
-    def popitem(self) -> tuple[str, Any]:
-        return self.__dict__.popitem()
 
     def setdefault(self, key: str, default_value: Any | None = None) -> Any | None:
         return self.__dict__.setdefault(key, default_value)
@@ -283,8 +279,7 @@ class ETag(str):
             bool: ``True`` if the two entity-tags match, otherwise ``False``.
 
         """
-
-        return self == other and not (self.is_weak or other.is_weak)
+        pass
 
     def dumps(self) -> str:
         """Serialize the ETag to a string suitable for use in a precondition header.

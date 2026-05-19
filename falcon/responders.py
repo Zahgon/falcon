@@ -95,18 +95,8 @@ def create_default_options(
 
     if asgi:
 
-        async def options_responder_async(
-            req: AsgiRequest, resp: AsgiResponse, **kwargs: Any
-        ) -> None:
-            resp.status = HTTP_200
-            resp.set_header('Allow', allowed)
-            resp.set_header('Content-Length', '0')
 
         return options_responder_async
 
-    def options_responder(req: Request, resp: Response, **kwargs: Any) -> None:
-        resp.status = HTTP_200
-        resp.set_header('Allow', allowed)
-        resp.set_header('Content-Length', '0')
 
     return options_responder

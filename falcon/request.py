@@ -369,43 +369,28 @@ class Request:
 
         (See also: RFC 7239, Section 4)
         """  # noqa: D205
-        # PERF(kgriffs): We could DRY up this memoization pattern using
-        # a decorator, but that would incur additional overhead without
-        # resorting to some trickery to rewrite the body of the method
-        # itself (vs. simply wrapping it with some memoization logic).
-        # At some point we might look into this but I don't think
-        # it's worth it right now.
-        if self._cached_forwarded is None:
-            forwarded = self.get_header('Forwarded')
-            if forwarded is None:
-                return None
-
-            self._cached_forwarded = _parse_forwarded_header(forwarded)
-
-        return self._cached_forwarded
+        pass
 
     @property
     def client_accepts_json(self) -> bool:
         """``True`` if the Accept header indicates that the client is
         willing to receive JSON, otherwise ``False``.
         """  # noqa: D205
-        return self.client_accepts('application/json')
+        pass
 
     @property
     def client_accepts_msgpack(self) -> bool:
         """``True`` if the Accept header indicates that the client is
         willing to receive MessagePack, otherwise ``False``.
         """  # noqa: D205
-        return self.client_accepts('application/x-msgpack') or self.client_accepts(
-            'application/msgpack'
-        )
+        pass
 
     @property
     def client_accepts_xml(self) -> bool:
         """``True`` if the Accept header indicates that the client is
         willing to receive XML, otherwise ``False``.
         """  # noqa: D205
-        return self.client_accepts('application/xml')
+        pass
 
     @property
     def accept(self) -> str:
@@ -423,31 +408,7 @@ class Request:
 
         Returns ``None`` if the header is missing.
         """
-        try:
-            value = self.env['CONTENT_LENGTH']
-        except KeyError:
-            return None
-
-        # NOTE(kgriffs): Normalize an empty value to behave as if
-        # the header were not included; wsgiref, at least, inserts
-        # an empty CONTENT_LENGTH value if the request does not
-        # set the header. Gunicorn and uWSGI do not do this, but
-        # others might if they are trying to match wsgiref's
-        # behavior too closely.
-        if not value:
-            return None
-
-        try:
-            value_as_int = int(value)
-        except ValueError:
-            msg = 'The value of the header must be a number.'
-            raise errors.HTTPInvalidHeader(msg, 'Content-Length')
-
-        if value_as_int < 0:
-            msg = 'The value of the header must be a positive number.'
-            raise errors.HTTPInvalidHeader(msg, 'Content-Length')
-
-        return value_as_int
+        pass
 
     @property
     def bounded_stream(self) -> BoundedStream:
@@ -468,10 +429,7 @@ class Request:
 
             doc = json.load(req.bounded_stream)
         """  # noqa: D205
-        if self._bounded_stream is None:
-            self._bounded_stream = self._get_wrapped_wsgi_input()
-
-        return self._bounded_stream
+        pass
 
     @property
     def date(self) -> datetime | None:
@@ -497,17 +455,7 @@ class Request:
 
         (See also: RFC 7232, Section 3.1)
         """  # noqa: D205
-        # TODO(kgriffs): It may make sense at some point to create a
-        #   header property generator that DRY's up the memoization
-        #   pattern for us.
-        if self._cached_if_match is _UNSET:
-            header_value = self.env.get('HTTP_IF_MATCH')
-            if header_value:
-                self._cached_if_match = helpers._parse_etags(header_value)
-            else:
-                self._cached_if_match = None
-
-        return self._cached_if_match
+        pass
 
     @property
     def if_none_match(self) -> list[ETag | Literal['*']] | None:
@@ -521,14 +469,7 @@ class Request:
 
         (See also: RFC 7232, Section 3.2)
         """  # noqa: D205
-        if self._cached_if_none_match is _UNSET:
-            header_value = self.env.get('HTTP_IF_NONE_MATCH')
-            if header_value:
-                self._cached_if_none_match = helpers._parse_etags(header_value)
-            else:
-                self._cached_if_none_match = None
-
-        return self._cached_if_none_match
+        pass
 
     @property
     def if_modified_since(self) -> datetime | None:
@@ -540,7 +481,7 @@ class Request:
             This property now returns timezone-aware
             :class:`~datetime.datetime` objects (or ``None``).
         """
-        return self.get_header_as_datetime('If-Modified-Since')
+        pass
 
     @property
     def if_unmodified_since(self) -> datetime | None:
@@ -552,7 +493,7 @@ class Request:
             This property now returns timezone-aware
             :class:`~datetime.datetime` objects (or ``None``).
         """
-        return self.get_header_as_datetime('If-Unmodified-Since')
+        pass
 
     @property
     def range(self) -> tuple[int, int] | None:
@@ -569,47 +510,7 @@ class Request:
         result in an HTTPBadRequest exception when the attribute is
         accessed).
         """  # noqa: D205
-        value = self.get_header('Range')
-        if value is None:
-            return None
-
-        if '=' in value:
-            unit, sep, req_range = value.partition('=')
-        else:
-            msg = "The value must be prefixed with a range unit, e.g. 'bytes='"
-            raise errors.HTTPInvalidHeader(msg, 'Range')
-
-        if ',' in req_range:
-            msg = 'The value must be a continuous range.'
-            raise errors.HTTPInvalidHeader(msg, 'Range')
-
-        try:
-            first, sep, last = req_range.partition('-')
-
-            if not sep:
-                raise ValueError()
-
-            if first and last:
-                first_num, last_num = (int(first), int(last))
-                if last_num < first_num:
-                    raise ValueError()
-            elif first:
-                first_num, last_num = (int(first), -1)
-            elif last:
-                first_num, last_num = (-int(last), -1)
-                if first_num >= 0:
-                    raise ValueError()
-            else:
-                msg = 'The range offsets are missing.'
-                raise errors.HTTPInvalidHeader(msg, 'Range')
-
-            return first_num, last_num
-
-        except ValueError:
-            href = 'https://tools.ietf.org/html/rfc7233'
-            href_text = 'HTTP/1.1 Range Requests'
-            msg = 'It must be a range formatted according to RFC 7233.'
-            raise errors.HTTPInvalidHeader(msg, 'Range', href=href, href_text=href_text)
+        pass
 
     @property
     def range_unit(self) -> str | None:
@@ -617,16 +518,7 @@ class Request:
 
         Returns ``None`` if the header is missing.
         """
-        value = self.get_header('Range')
-        if value is None:
-            return None
-
-        if value and '=' in value:
-            unit, sep, req_range = value.partition('=')
-            return unit
-        else:
-            msg = "The value must be prefixed with a range unit, e.g. 'bytes='"
-            raise errors.HTTPInvalidHeader(msg, 'Range')
+        pass
 
     @property
     def root_path(self) -> str:
@@ -640,16 +532,7 @@ class Request:
         by PEP-3333; in ASGI it Corresponds to the "root_path" ASGI HTTP
         scope field.)
         """  # noqa: D205
-        # PERF(kgriffs): try..except is faster than get() assuming that
-        # we normally expect the key to exist. Even though PEP-3333
-        # allows WSGI servers to omit the key when the value is an
-        # empty string, uwsgi, gunicorn, waitress, and wsgiref all
-        # include it even in that case.
-        try:
-            # TODO(0xMattB): Implement advanced typing to type as 'str' (see PR #2599)
-            return self.env['SCRIPT_NAME']  # type: ignore[no-any-return]
-        except KeyError:
-            return ''
+        pass
 
     @property
     # NOTE(caselit): Deprecated long ago. Warns since 4.0.
@@ -672,8 +555,7 @@ class Request:
             :attr:`forwarded_scheme` can be used, instead,
             to handle such cases.
         """
-        # TODO(0xMattB): Implement advanced typing to type as 'str' (see PR #2599)
-        return self.env['wsgi.url_scheme']  # type: ignore[no-any-return]
+        pass
 
     @property
     def forwarded_scheme(self) -> str:
@@ -694,29 +576,7 @@ class Request:
 
         (See also: RFC 7239, Section 1)
         """
-        # PERF(kgriffs): Since the Forwarded header is still relatively
-        # new, we expect X-Forwarded-Proto to be more common, so
-        # try to avoid calling self.forwarded if we can, since it uses a
-        # try...catch that will usually result in a relatively expensive
-        # raised exception.
-        if 'HTTP_FORWARDED' in self.env:
-            forwarded = self.forwarded
-            if forwarded:
-                # Use first hop, fall back on own scheme
-                scheme = forwarded[0].scheme or self.scheme
-            else:
-                scheme = self.scheme
-        else:
-            # PERF(kgriffs): This call should normally succeed, so
-            # just go for it without wasting time checking it
-            # first. Note also that the indexing operator is
-            # slightly faster than using get().
-            try:
-                scheme = self.env['HTTP_X_FORWARDED_PROTO'].lower()
-            except KeyError:
-                scheme = self.env['wsgi.url_scheme']
-
-        return scheme
+        pass
 
     @property
     def uri(self) -> str:
@@ -741,42 +601,21 @@ class Request:
         Uses :attr:`forwarded_scheme` and :attr:`forwarded_host` in order
         to reconstruct the original URI requested by the user agent.
         """
-        if self._cached_forwarded_uri is None:
-            # PERF: For small numbers of items, '+' is faster
-            # than ''.join(...). Concatenation is also generally
-            # faster than formatting.
-            value = (
-                self.forwarded_scheme + '://' + self.forwarded_host + self.relative_uri
-            )
-
-            self._cached_forwarded_uri = value
-
-        return self._cached_forwarded_uri
+        pass
 
     @property
     def relative_uri(self) -> str:
         """The path and query string portion of the
         request URI, omitting the scheme and host.
         """  # noqa: D205
-        if self._cached_relative_uri is None:
-            if self.query_string:
-                self._cached_relative_uri = (
-                    self.root_path + self.path + '?' + self.query_string
-                )
-            else:
-                self._cached_relative_uri = self.root_path + self.path
-
-        return self._cached_relative_uri
+        pass
 
     @property
     def prefix(self) -> str:
         """The prefix of the request URI, including scheme,
         host, and app :attr:`~.root_path` (if any).
         """  # noqa: D205
-        if self._cached_prefix is None:
-            self._cached_prefix = self.scheme + '://' + self.netloc + self.root_path
-
-        return self._cached_prefix
+        pass
 
     @property
     def forwarded_prefix(self) -> str:
@@ -785,28 +624,12 @@ class Request:
         Uses :attr:`forwarded_scheme` and :attr:`forwarded_host` in order
         to reconstruct the original URI.
         """
-        if self._cached_forwarded_prefix is None:
-            self._cached_forwarded_prefix = (
-                self.forwarded_scheme + '://' + self.forwarded_host + self.root_path
-            )
-
-        return self._cached_forwarded_prefix
+        pass
 
     @property
     def host(self) -> str:
         """Host request header field."""
-        try:
-            # NOTE(kgriffs): Prefer the host header; the web server
-            # isn't supposed to mess with it, so it should be what
-            # the client actually sent.
-            host_header = self.env['HTTP_HOST']
-            host, port = parse_host(host_header)
-        except KeyError:
-            # PERF(kgriffs): According to PEP-3333, this header
-            # will always be present.
-            host = self.env['SERVER_NAME']
-
-        return host
+        pass
 
     @property
     def forwarded_host(self) -> str:
@@ -832,29 +655,7 @@ class Request:
 
         (See also: RFC 7239, Section 4)
         """  # noqa: D205
-        # PERF(kgriffs): Since the Forwarded header is still relatively
-        # new, we expect X-Forwarded-Host to be more common, so
-        # try to avoid calling self.forwarded if we can, since it uses a
-        # try...catch that will usually result in a relatively expensive
-        # raised exception.
-        if 'HTTP_FORWARDED' in self.env:
-            forwarded = self.forwarded
-            if forwarded:
-                # Use first hop, fall back on self
-                host = forwarded[0].host or self.netloc
-            else:
-                host = self.netloc
-        else:
-            # PERF(kgriffs): This call should normally succeed, assuming
-            # that the caller is expecting a forwarded header, so
-            # just go for it without wasting time checking it
-            # first.
-            try:
-                host = self.env['HTTP_X_FORWARDED_HOST']
-            except KeyError:
-                host = self.netloc
-
-        return host
+        pass
 
     @property
     def subdomain(self) -> str | None:
@@ -866,9 +667,7 @@ class Request:
             If the hostname in the request is an IP address, the value
             for `subdomain` is undefined.
         """
-        # PERF(kgriffs): .partition is slightly faster than .split
-        subdomain, sep, remainder = self.host.partition('.')
-        return subdomain if sep else None
+        pass
 
     @property
     def headers(self) -> Mapping[str, str]:
@@ -889,20 +688,7 @@ class Request:
             instead use the ``get_header()`` method or one of the
             convenience attributes to get a value for a specific header.
         """  # noqa: D205
-        if self._cached_headers is None:
-            headers = self._cached_headers = {}
-
-            for name, value in self.env.items():
-                if name.startswith('HTTP_'):
-                    # NOTE(kgriffs): Don't take the time to fix the case
-                    # since headers are supposed to be case-insensitive
-                    # anyway.
-                    headers[name[5:].replace('_', '-')] = value
-
-                elif name in WSGI_CONTENT_HEADERS:
-                    headers[name.replace('_', '-')] = value
-
-        return self._cached_headers
+        pass
 
     @property
     def headers_lower(self) -> Mapping[str, str]:
@@ -910,12 +696,7 @@ class Request:
 
         .. versionadded:: 4.0
         """
-        if self._cached_headers_lower is None:
-            self._cached_headers_lower = {
-                key.lower(): value for key, value in self.headers.items()
-            }
-
-        return self._cached_headers_lower
+        pass
 
     @property
     def params(self) -> Mapping[str, str | list[str]]:
@@ -925,7 +706,7 @@ class Request:
         string, the value mapped to that parameter key will be a list of
         all the values in the order seen.
         """
-        return self._params
+        pass
 
     @property
     def cookies(self) -> Mapping[str, str]:
@@ -938,17 +719,7 @@ class Request:
         See also: :meth:`~falcon.Request.get_cookie_values` or
         :meth:`~falcon.asgi.Request.get_cookie_values`.
         """
-        if self._cookies_collapsed is None:
-            if self._cookies is None:
-                header_value = self.get_header('Cookie')
-                if header_value:
-                    self._cookies = helpers._parse_cookie_header(header_value)
-                else:
-                    self._cookies = {}
-
-            self._cookies_collapsed = {n: v[0] for n, v in self._cookies.items()}
-
-        return self._cookies_collapsed
+        pass
 
     @property
     def access_route(self) -> list[str]:
@@ -978,37 +749,7 @@ class Request:
             using them. Do not rely on the access route to authorize
             requests.
         """  # noqa: D205
-        if self._cached_access_route is None:
-            # NOTE(kgriffs): Try different headers in order of
-            # preference; if none are found, fall back to REMOTE_ADDR.
-            #
-            # If one of these headers is present, but its value is
-            # malformed such that we end up with an empty list, or
-            # a non-empty list containing malformed values, go ahead
-            # and return the results as-is. The alternative would be
-            # to fall back to another header or to REMOTE_ADDR, but
-            # that only masks the problem; the operator needs to be
-            # aware that an upstream proxy is malfunctioning.
-
-            if 'HTTP_FORWARDED' in self.env:
-                self._cached_access_route = []
-                for hop in self.forwarded or ():
-                    if hop.src is not None:
-                        host, __ = parse_host(hop.src)
-                        self._cached_access_route.append(host)
-            elif 'HTTP_X_FORWARDED_FOR' in self.env:
-                addresses = self.env['HTTP_X_FORWARDED_FOR'].split(',')
-                self._cached_access_route = [ip.strip() for ip in addresses]
-            elif 'HTTP_X_REAL_IP' in self.env:
-                self._cached_access_route = [self.env['HTTP_X_REAL_IP']]
-
-            if self._cached_access_route:
-                if self._cached_access_route[-1] != self.remote_addr:
-                    self._cached_access_route.append(self.remote_addr)
-            else:
-                self._cached_access_route = [self.remote_addr]
-
-        return self._cached_access_route
+        pass
 
     @property
     def remote_addr(self) -> str:
@@ -1024,12 +765,7 @@ class Request:
             proxies, you can use :attr:`~.access_route`
             to retrieve the real IP address of the client.
         """
-        try:
-            value: str = self.env['REMOTE_ADDR']
-        except KeyError:
-            value = '127.0.0.1'
-
-        return value
+        pass
 
     @property
     def port(self) -> int:
@@ -1040,20 +776,7 @@ class Request:
         for HTTPS). If the request does not include a Host header, the listening
         port for the server is returned instead.
         """
-        try:
-            host_header = self.env['HTTP_HOST']
-
-            default_port = 80 if self.env['wsgi.url_scheme'] == 'http' else 443
-            _, port = parse_host(host_header, default_port=default_port)
-        except KeyError:
-            # NOTE(kgriffs): Normalize to an int, since that is the type
-            # returned by parse_host().
-            #
-            # NOTE(kgriffs): In the case that SERVER_PORT was used,
-            # PEP-3333 requires that the port never be an empty string.
-            port = int(self.env['SERVER_PORT'])
-
-        return port
+        pass
 
     @property
     def netloc(self) -> str:
@@ -1062,26 +785,7 @@ class Request:
         The port may be omitted if it is the default one for the URL's schema
         (80 for HTTP and 443 for HTTPS).
         """
-        env = self.env
-        # NOTE(kgriffs): According to PEP-3333 we should first
-        # try to use the Host header if present.
-        #
-        # PERF(kgriffs): try..except is faster than get() when we
-        # expect the key to be present most of the time.
-        try:
-            netloc_value: str = env['HTTP_HOST']
-        except KeyError:
-            netloc_value = env['SERVER_NAME']
-
-            port: str = env['SERVER_PORT']
-            if self.scheme == 'https':
-                if port != '443':
-                    netloc_value += ':' + port
-            else:
-                if port != '80':
-                    netloc_value += ':' + port
-
-        return netloc_value
+        pass
 
     def get_media(self, default_when_empty: UnsetOr[Any] = _UNSET) -> Any:
         """Return a deserialized form of the request stream.
@@ -1220,33 +924,7 @@ class Request:
             https://spec.openapis.org/oas/latest.html#parameter-object-examples
 
         """
-        if media_type is None:
-            media_type = self.options.default_media_type
-
-        handler, _, _ = self.options.media_handlers._resolve(
-            media_type, self.options.default_media_type, raise_not_found=False
-        )
-        if handler is None:
-            raise ValueError(
-                f'No media handler is configured for {media_type!r}. '
-                'Please ensure the media type is registered in '
-                'RequestOptions.media_handlers.'
-            )
-
-        # URL-decode the query string
-        decoded_query_string = util.uri.decode(self.query_string, unquote_plus=False)
-
-        # Encode once and reuse bytes for BytesIO and length to avoid
-        # double-encoding the string.
-        query_bytes = decoded_query_string.encode('utf-8')
-        query_stream = BytesIO(query_bytes)
-
-        try:
-            return handler.deserialize(query_stream, media_type, len(query_bytes))
-        except errors.MediaNotFoundError:
-            if default_when_empty is not _UNSET:
-                return default_when_empty
-            raise
+        pass
 
     # ------------------------------------------------------------------------
     # Methods
@@ -1263,19 +941,7 @@ class Request:
             that it accepts the specified media type. Otherwise, returns
             ``False``.
         """
-
-        accept = self.accept
-
-        # PERF(kgriffs): Usually the following will be true, so
-        # try it first.
-        if (accept == media_type) or (accept == '*/*'):
-            return True
-
-        # Fall back to full-blown parsing
-        try:
-            return mediatypes.quality(media_type, accept) != 0.0
-        except ValueError:
-            return False
+        pass
 
     def client_prefers(self, media_types: Iterable[str]) -> str | None:
         """Return the client's preferred media type, given several choices.
@@ -1290,15 +956,7 @@ class Request:
             header. Returns ``None`` if the client does not accept any
             of the given types.
         """
-
-        try:
-            # NOTE(kgriffs): best_match will return '' if no match is found
-            preferred_type = mediatypes.best_match(media_types, self.accept)
-        except ValueError:
-            # Value for the accept header was not formatted correctly
-            preferred_type = ''
-
-        return preferred_type if preferred_type else None
+        pass
 
     @overload
     def get_header(
@@ -1395,13 +1053,7 @@ class Request:
 
         .. versionadded:: 4.0
         """
-
-        http_int = self.get_header(header, required=required)
-        try:
-            return int(http_int) if http_int is not None else None
-        except ValueError:
-            msg = 'The value of the header must be an integer.'
-            raise errors.HTTPInvalidHeader(msg, header)
+        pass
 
     @overload
     def get_header_as_datetime(
@@ -1468,21 +1120,7 @@ class Request:
             header, the returned list of values will preserve the ordering of
             the individual ``cookie-pair``'s in the header.
         """
-
-        if self._cookies is None:
-            # PERF(kgriffs): While this code isn't exactly DRY (the same code
-            # is duplicated by the cookies property) it does make things a bit
-            # more performant by removing the extra function call that would
-            # be required to factor this out. If we ever have to do this in a
-            # *third* place, we would probably want to factor it out at that
-            # point.
-            header_value = self.get_header('Cookie')
-            if header_value:
-                self._cookies = helpers._parse_cookie_header(header_value)
-            else:
-                self._cookies = {}
-
-        return self._cookies.get(name)
+        pass
 
     @overload
     def get_param(
@@ -1571,28 +1209,7 @@ class Request:
             HTTPBadRequest: A required param is missing from the request.
 
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            # NOTE(warsaw): If the key appeared multiple times, it will be
-            # stored internally as a list.  We do not define which one
-            # actually gets returned, but let's pick the last one for grins.
-            param = params[name]
-            if isinstance(param, list):
-                param = param[-1]
-
-            if store is not None:
-                store[name] = param
-
-            return param
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_int(
@@ -1673,39 +1290,7 @@ class Request:
                 max_value to avoid triggering an error.
 
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            val_str = params[name]
-            if isinstance(val_str, list):
-                val_str = val_str[-1]
-
-            try:
-                val = int(val_str)
-            except ValueError:
-                msg = 'The value must be an integer.'
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if min_value is not None and val < min_value:
-                msg = 'The value must be at least ' + str(min_value)
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if max_value is not None and max_value < val:
-                msg = 'The value may not exceed ' + str(max_value)
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if store is not None:
-                store[name] = val
-
-            return val
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_float(
@@ -1785,39 +1370,7 @@ class Request:
                 max_value to avoid triggering an error.
 
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            val_str = params[name]
-            if isinstance(val_str, list):
-                val_str = val_str[-1]
-
-            try:
-                val = float(val_str)
-            except ValueError:
-                msg = 'The value must be a float.'
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if min_value is not None and val < min_value:
-                msg = 'The value must be at least ' + str(min_value)
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if max_value is not None and max_value < val:
-                msg = 'The value may not exceed ' + str(max_value)
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if store is not None:
-                store[name] = val
-
-            return val
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_uuid(
@@ -1893,31 +1446,7 @@ class Request:
                 though it was required to be there, or it was found but
                 could not be converted to a ``UUID``.
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            val_str = params[name]
-            if isinstance(val_str, list):
-                val_str = val_str[-1]
-
-            try:
-                val = UUID(val_str)
-            except ValueError:
-                msg = 'The value must be a UUID string.'
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if store is not None:
-                store[name] = val
-
-            return val
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_bool(
@@ -2001,35 +1530,7 @@ class Request:
                 can not be converted to a ``bool``.
 
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            val_str = params[name]
-            if isinstance(val_str, list):
-                val_str = val_str[-1]
-
-            if val_str in TRUE_STRINGS:
-                val = True
-            elif val_str in FALSE_STRINGS:
-                val = False
-            elif not val_str:
-                val = blank_as_true
-            else:
-                msg = 'The value of the parameter must be "true" or "false".'
-                raise errors.HTTPInvalidParam(msg, name)
-
-            if store is not None:
-                store[name] = val
-
-            return val
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_list(
@@ -2196,53 +1697,7 @@ class Request:
                 a transform function raised an instance of ``ValueError``.
 
         """
-
-        params = self._params
-
-        # PERF: Use if..in since it is a good all-around performer; we don't
-        #       know how likely params are to be specified by clients.
-        if name in params:
-            items = params[name]
-
-            # NOTE(bricklayer25): If a delimiter is specified AND the param is
-            #   a single string, split it.
-            if delimiter is not None and isinstance(items, str):
-                if delimiter not in _PARAM_VALUE_DELIMITERS:
-                    raise ValueError(
-                        f'Unsupported delimiter value: {delimiter!r};'
-                        f' supported: {tuple(_PARAM_VALUE_DELIMITERS)}'
-                    )
-                items = items.split(_PARAM_VALUE_DELIMITERS[delimiter])
-
-            # NOTE(warsaw): When a key appears multiple times in the request
-            # query, it will already be represented internally as a list.
-            # NOTE(kgriffs): Likewise for comma-delimited values.
-            if not isinstance(items, list):
-                items = [items]
-
-            items_ret: list[str] | list[_T]
-            # PERF(kgriffs): Use if-else rather than a DRY approach
-            # that sets transform to a passthrough function; avoids
-            # function calling overhead.
-            if transform is not None:
-                try:
-                    items_ret = [transform(i) for i in items]
-
-                except ValueError:
-                    msg = 'The value is not formatted correctly.'
-                    raise errors.HTTPInvalidParam(msg, name)
-            else:
-                items_ret = items
-
-            if store is not None:
-                store[name] = items_ret
-
-            return items_ret
-
-        if not required:
-            return default
-
-        raise errors.HTTPMissingParam(name)
+        pass
 
     @overload
     def get_param_as_datetime(
@@ -2319,22 +1774,7 @@ class Request:
             the converted :class:`~datetime.datetime` object is now
             timezone-aware.
         """
-
-        param_value = self.get_param(name, required=required)
-
-        if param_value is None:
-            return default
-
-        try:
-            date_time = strptime(param_value, format_string)
-        except ValueError:
-            msg = 'The date value does not match the required format.'
-            raise errors.HTTPInvalidParam(msg, name)
-
-        if store is not None:
-            store[name] = date_time
-
-        return date_time
+        pass
 
     @overload
     def get_param_as_date(
@@ -2403,17 +1843,7 @@ class Request:
             HTTPBadRequest: A required param is missing from the request, or
                 the value could not be converted to a ``date``.
         """
-
-        date_time = self.get_param_as_datetime(name, format_string, required)
-        if date_time:
-            date = date_time.date()
-        else:
-            return default
-
-        if store is not None:
-            store[name] = date
-
-        return date
+        pass
 
     def get_param_as_json(
         self,
@@ -2455,15 +1885,7 @@ class Request:
             HTTPBadRequest: A required param is missing from the request, or
                 the value could not be parsed as JSON.
         """
-
-        # NOTE(mannxo): Delegate to the more general get_param_as_media implementation.
-        return self.get_param_as_media(
-            name,
-            media_type=MEDIA_JSON,
-            required=required,
-            store=store,
-            default=default,
-        )
+        pass
 
     def get_param_as_media(
         self,
@@ -2498,46 +1920,7 @@ class Request:
             HTTPBadRequest: A required param is missing from the request, or
                 the value could not be parsed by the selected media handler.
         """
-
-        param_value = self.get_param(name, required=required)
-
-        if param_value is None:
-            return default
-
-        # Resolve media handler
-        if media_type is None:
-            # Fall back to the app's default media type.
-            media_type = self.options.default_media_type
-
-        handler, _, _ = self.options.media_handlers._resolve(
-            media_type, self.options.default_media_type, raise_not_found=False
-        )
-        if handler is None:
-            # NOTE(mannxo): Substring match is intentional; covers variants
-            #   like 'application/json; charset=utf-8' and is good enough in
-            #   practice until a stricter check is warranted.
-            if media_type and MEDIA_JSON in media_type:
-                handler = _DEFAULT_JSON_HANDLER
-            else:
-                raise errors.HTTPInternalServerError(
-                    title=f'No media handler exists for "{media_type}"'
-                )
-
-        try:
-            # TODO(CaselIT): find a way to avoid encode + BytesIO if handlers
-            #   interface is refactored. Possibly using the WS interface?
-            val = handler.deserialize(
-                BytesIO(param_value.encode()), media_type, len(param_value)
-            )
-        except errors.HTTPBadRequest:
-            raise errors.HTTPInvalidParam(
-                f'It could not be deserialized as "{media_type}".', name
-            )
-
-        if store is not None:
-            store[name] = val
-
-        return val
+        pass
 
     def get_param_as_dict(
         self,
@@ -2602,50 +1985,7 @@ class Request:
 
         .. versionadded:: 4.3
         """
-
-        output: dict[str, str] | None
-
-        if deep_object:
-            oc: dict[str, str] = {}
-            prefix = f'{name}['
-            prefix_len = len(prefix)
-            for key, value in self._params.items():
-                if not (key.startswith(prefix) and key.endswith(']')):
-                    continue
-                inner = key[prefix_len:-1]
-
-                if isinstance(value, list):
-                    # NOTE(StepanUFL): An empty list is not expected to occur
-                    #   in practice here, but keep the check defensively so
-                    #   the return type is consistently str.
-                    oc[inner] = value[0] if value else ''
-                else:
-                    oc[inner] = value
-
-            if not oc:
-                if required:
-                    raise errors.HTTPMissingParam(name)
-                output = default
-            else:
-                output = oc
-
-        else:
-            values_list = self.get_param_as_list(
-                name, required=required, delimiter=delimiter
-            )
-
-            if values_list is None:
-                output = default
-            elif len(values_list) % 2 != 0:
-                msg = 'The number of list elements must be even.'
-                raise errors.HTTPInvalidParam(msg, name)
-            else:
-                output = dict(zip(values_list[::2], values_list[1::2]))
-
-        if output is not None and store is not None:
-            store[name] = output
-
-        return output
+        pass
 
     def has_param(self, name: str) -> bool:
         """Determine whether or not the query string parameter already exists.
@@ -2658,8 +1998,7 @@ class Request:
             not found.
 
         """
-
-        return name in self._params
+        pass
 
     def log_error(self, message: str) -> None:
         """Write an error message to the server's log.
@@ -2671,66 +2010,13 @@ class Request:
             message (str): Description of the problem.
 
         """
-
-        if self.query_string:
-            query_string_formatted = '?' + self.query_string
-        else:
-            query_string_formatted = ''
-
-        log_line = DEFAULT_ERROR_LOG_FORMAT.format(
-            now(), self.method, self.path, query_string_formatted
-        )
-
-        self._wsgierrors.write(log_line + message + '\n')
+        pass
 
     # ------------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------------
 
-    def _get_wrapped_wsgi_input(self) -> BoundedStream:
-        try:
-            content_length = self.content_length or 0
 
-        # NOTE(kgriffs): This branch is indeed covered in test_wsgi.py
-        # even though coverage isn't able to detect it.
-        except errors.HTTPInvalidHeader:  # pragma: no cover
-            # NOTE(kgriffs): The content-length header was specified,
-            # but it had an invalid value. Assume no content.
-            content_length = 0
-
-        return BoundedStream(self.env['wsgi.input'], content_length)
-
-    def _parse_form_urlencoded(self) -> None:
-        content_length = self.content_length
-        if not content_length:
-            return
-
-        body_bytes = self.stream.read(content_length)
-
-        # NOTE(kgriffs): According to
-        # https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#application%2Fx-www-form-urlencoded-encoding-algorithm
-        # the
-        # body should be US-ASCII. Enforcing this also helps
-        # catch malicious input.
-        try:
-            body = body_bytes.decode('ascii')
-        except UnicodeDecodeError:
-            body = None
-            self.log_error(
-                'Non-ASCII characters found in form body '
-                'with Content-Type of '
-                'application/x-www-form-urlencoded. Body '
-                'will be ignored.'
-            )
-
-        if body:
-            extra_params = parse_query_string(
-                body,
-                keep_blank=self.options.keep_blank_qs_values,
-                csv=self.options.auto_parse_qs_csv,
-            )
-
-            self._params.update(extra_params)
 
 
 # PERF: To avoid typos and improve storage space and speed over a dict.
@@ -2788,19 +2074,8 @@ class RequestOptions:
             encoded according to the standard W3C algorithm (see
             also https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#application%2Fx-www-form-urlencoded-encoding-algorithm).
         """  # noqa: D205
-        return self._auto_parse_form_urlencoded
+        pass
 
-    @auto_parse_form_urlencoded.setter
-    def auto_parse_form_urlencoded(self, value: bool) -> None:
-        if value:
-            warnings.warn(
-                'The RequestOptions.auto_parse_form_urlencoded option is '
-                'deprecated. Please use Request.get_media() to consume '
-                'the submitted URL-encoded form instead.',
-                category=deprecation.DeprecatedWarning,
-            )
-
-        self._auto_parse_form_urlencoded = value
 
     auto_parse_qs_csv: bool
     """Set to ``True`` to split query string values on any non-percent-encoded

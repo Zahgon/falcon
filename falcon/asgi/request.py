@@ -279,55 +279,11 @@ class Request(request.Request):
         except KeyError:
             return '*/*'
 
-    @property
-    def content_length(self) -> int | None:
-        try:
-            value = self._asgi_headers[b'content-length']
-        except KeyError:
-            return None
-
-        try:
-            # PERF(vytas): int() also works with a bytestring argument.
-            value_as_int = int(value)
-        except ValueError:
-            # PERF(vytas): Check for an empty value in the except clause,
-            #   because we do not expect ASGI servers to inject any headers
-            #   that the client did not provide.
-
-            # NOTE(kgriffs): Normalize an empty value to behave as if
-            # the header were not included; wsgiref, at least, inserts
-            # an empty CONTENT_LENGTH value if the request does not
-            # set the header. Gunicorn and uWSGI do not do this, but
-            # others might if they are trying to match wsgiref's
-            # behavior too closely.
-            if not value:
-                return None
-
-            msg = 'The value of the header must be a number.'
-            raise errors.HTTPInvalidHeader(msg, 'Content-Length')
-
-        if value_as_int < 0:
-            msg = 'The value of the header must be a positive number.'
-            raise errors.HTTPInvalidHeader(msg, 'Content-Length')
-
-        return value_as_int
 
     @property
     def stream(self) -> BoundedStream:  # type: ignore[override]
         """File-like input object for reading the body of the request, if any."""
-        if self.is_websocket:
-            raise errors.UnsupportedError(
-                'ASGI does not support reading the WebSocket handshake request body.'
-            )
-
-        if not self._stream:
-            self._stream = BoundedStream(
-                self._receive,
-                first_event=self._first_event,
-                content_length=self.content_length,
-            )
-
-        return self._stream
+        pass
 
     # NOTE(kgriffs): This is provided as an alias in order to ease migration
     #   from WSGI, but is not documented since we do not want people using
@@ -335,22 +291,8 @@ class Request(request.Request):
     @property
     def bounded_stream(self) -> BoundedStream:  # type: ignore[override]
         """Alias to :attr:`~.stream`."""
-        return self.stream
+        pass
 
-    @property
-    def root_path(self) -> str:
-        # PERF(kgriffs): try...except is faster than get() assuming that
-        #   we normally expect the key to exist. Even though ASGI 3.0
-        #   allows servers to omit the key when the value is an
-        #   empty string, at least uvicorn still includes it explicitly in
-        #   that case.
-        try:
-            # TODO(0xMattB): Implement advanced typing to type as 'str' (see gh #2628).
-            return self.scope['root_path']  # type: ignore[no-any-return]
-        except KeyError:
-            pass
-
-        return ''
 
     @property
     # NOTE(caselit): Deprecated long ago. Warns since 4.0.
@@ -377,43 +319,8 @@ class Request(request.Request):
             :attr:`forwarded_scheme` can be used, instead,
             to handle such cases.
         """
-        # PERF(kgriffs): Use try...except because we normally expect the
-        #   key to be present.
-        try:
-            # TODO(0xMattB): Implement advanced typing to type as 'str' (see gh #2628).
-            return self.scope['scheme']  # type: ignore[no-any-return]
-        except KeyError:
-            pass
+        pass
 
-        return 'ws' if self.is_websocket else 'http'
-
-    @property
-    def forwarded_scheme(self) -> str:
-        # PERF(kgriffs): Since the Forwarded header is still relatively
-        # new, we expect X-Forwarded-Proto to be more common, so
-        # try to avoid calling self.forwarded if we can, since it uses a
-        # try...catch that will usually result in a relatively expensive
-        # raised exception.
-        if b'forwarded' in self._asgi_headers:
-            forwarded = self.forwarded
-            if forwarded:
-                # Use first hop, fall back on own scheme
-                scheme = forwarded[0].scheme or self.scheme
-            else:
-                scheme = self.scheme
-        else:
-            # PERF(kgriffs): This call should normally succeed, so
-            # just go for it without wasting time checking it
-            # first. Note also that the indexing operator is
-            # slightly faster than using get().
-            try:
-                scheme = (
-                    self._asgi_headers[b'x-forwarded-proto'].decode('latin1').lower()
-                )
-            except KeyError:
-                scheme = self.scheme
-
-        return scheme
 
     @property
     def host(self) -> str:
@@ -422,42 +329,8 @@ class Request(request.Request):
         If the Host header is missing, this attribute resolves to the ASGI server's
         listening host name or IP address.
         """
-        try:
-            # NOTE(kgriffs): Prefer the host header; the web server
-            # isn't supposed to mess with it, so it should be what
-            # the client actually sent.
-            host_header = self._asgi_headers[b'host'].decode('latin1')
-            host, __ = parse_host(host_header)
-        except KeyError:
-            host, __ = self._asgi_server
+        pass
 
-        return host
-
-    @property
-    def forwarded_host(self) -> str:
-        # PERF(kgriffs): Since the Forwarded header is still relatively
-        # new, we expect X-Forwarded-Host to be more common, so
-        # try to avoid calling self.forwarded if we can, since it uses a
-        # try...catch that will usually result in a relatively expensive
-        # raised exception.
-        if b'forwarded' in self._asgi_headers:
-            forwarded = self.forwarded
-            if forwarded:
-                # Use first hop, fall back on self
-                host = forwarded[0].host or self.netloc
-            else:
-                host = self.netloc
-        else:
-            # PERF(kgriffs): This call should normally succeed, assuming
-            # that the caller is expecting a forwarded header, so
-            # just go for it without wasting time checking it
-            # first.
-            try:
-                host = self._asgi_headers[b'x-forwarded-host'].decode('latin1')
-            except KeyError:
-                host = self.netloc
-
-        return host
 
     @property
     def access_route(self) -> list[str]:
@@ -490,50 +363,7 @@ class Request(request.Request):
             using them. Do not rely on the access route to authorize
             requests!
         """  # noqa: D205
-        if self._cached_access_route is None:
-            # PERF(kgriffs): 'client' is optional according to the ASGI spec
-            #   but it will probably be present, hence the try...except.
-            try:
-                # NOTE(kgriffs): The ASGI spec states that this can be
-                #   any iterable. So we need to read and cache it in
-                #   case the iterable is forward-only. But that is
-                #   effectively what we are doing since we only ever
-                #   access this field when setting self._cached_access_route
-                client, __ = self.scope['client']
-            # NOTE(vytas): Uvicorn may explicitly set scope['client'] to None.
-            #   According to the spec, it does default to None when missing,
-            #   but it is unclear whether it can be explicitly set to None, or
-            #   it must be a valid iterable when present. In any case, we
-            #   simply catch TypeError here too to account for this scenario.
-            except (KeyError, TypeError):
-                # NOTE(kgriffs): Default to localhost so that app logic does
-                #   note have to special-case the handling of a missing
-                #   client field in the connection scope. This should be
-                #   a reasonable default, but we can change it later if
-                #   that turns out not to be the case.
-                client = '127.0.0.1'
-
-            headers = self._asgi_headers
-
-            if b'forwarded' in headers:
-                self._cached_access_route = []
-                for hop in self.forwarded or ():
-                    if hop.src is not None:
-                        host, __ = parse_host(hop.src)
-                        self._cached_access_route.append(host)
-            elif b'x-forwarded-for' in headers:
-                addresses = headers[b'x-forwarded-for'].decode('latin1').split(',')
-                self._cached_access_route = [ip.strip() for ip in addresses]
-            elif b'x-real-ip' in headers:
-                self._cached_access_route = [headers[b'x-real-ip'].decode('latin1')]
-
-            if self._cached_access_route:
-                if self._cached_access_route[-1] != client:
-                    self._cached_access_route.append(client)
-            else:
-                self._cached_access_route = [client] if client else []
-
-        return self._cached_access_route
+        pass
 
     @property
     def remote_addr(self) -> str:
@@ -543,37 +373,9 @@ class Request(request.Request):
         This property's value is equivalent to the last element of the
         :attr:`~.access_route` property.
         """  # noqa: D205
-        route = self.access_route
-        return route[-1]
+        pass
 
-    @property
-    def port(self) -> int:
-        try:
-            host_header = self._asgi_headers[b'host'].decode('latin1')
-            default_port = 443 if self._secure_scheme else 80
-            __, port = parse_host(host_header, default_port=default_port)
-        except KeyError:
-            __, port = self._asgi_server
 
-        return port
-
-    @property
-    def netloc(self) -> str:
-        # PERF(kgriffs): try..except is faster than get() when we
-        # expect the key to be present most of the time.
-        try:
-            netloc_value = self._asgi_headers[b'host'].decode('latin1')
-        except KeyError:
-            netloc_value, port = self._asgi_server
-
-            if self._secure_scheme:
-                if port != 443:
-                    netloc_value = f'{netloc_value}:{port}'
-            else:
-                if port != 80:
-                    netloc_value = f'{netloc_value}:{port}'
-
-        return netloc_value
 
     async def get_media(self, default_when_empty: UnsetOr[Any] = _UNSET) -> Any:
         """Return a deserialized form of the request stream.
@@ -661,34 +463,7 @@ class Request(request.Request):
         deserialized_media = await req.media
     """
 
-    @property
-    def if_match(self) -> list[ETag | Literal['*']] | None:
-        # TODO(kgriffs): It may make sense at some point to create a
-        #   header property generator that DRY's up the memoization
-        #   pattern for us.
-        if self._cached_if_match is _UNSET:
-            header_value = self._asgi_headers.get(b'if-match')
-            if header_value:
-                self._cached_if_match = helpers._parse_etags(
-                    header_value.decode('latin1')
-                )
-            else:
-                self._cached_if_match = None
 
-        return self._cached_if_match
-
-    @property
-    def if_none_match(self) -> list[ETag | Literal['*']] | None:
-        if self._cached_if_none_match is _UNSET:
-            header_value = self._asgi_headers.get(b'if-none-match')
-            if header_value:
-                self._cached_if_none_match = helpers._parse_etags(
-                    header_value.decode('latin1')
-                )
-            else:
-                self._cached_if_none_match = None
-
-        return self._cached_if_none_match
 
     @property
     def headers(self) -> Mapping[str, str]:
@@ -710,22 +485,14 @@ class Request(request.Request):
             instead use the ``get_header()`` method or one of the
             convenience attributes to get a value for a specific header.
         """  # noqa: D205
-        # NOTE(kgriffs: First time here will cache the dict so all we
-        # have to do is clone it in the future.
-        if self._cached_headers is None:
-            self._cached_headers = {
-                name.decode('latin1'): value.decode('latin1')
-                for name, value in self._asgi_headers.items()
-            }
-
-        return self._cached_headers
+        pass
 
     @property
     def headers_lower(self) -> Mapping[str, str]:
         """Alias for :attr:`headers` provided to expose a uniform way to
         get lowercased headers for both WSGI and ASGI apps.
         """  # noqa: D205
-        return self.headers
+        pass
 
     # ------------------------------------------------------------------------
     # Public Methods
@@ -876,11 +643,7 @@ class Request(request.Request):
         Raises:
             HTTPBadRequest: A required param is missing from the request.
         """
-
-        # TODO(kgriffs): It seems silly to have to do this, simply to provide
-        #   the ASGI-specific docstring above. Is there a better way?
-
-        return super().get_param(name, required=required, store=store, default=default)
+        pass
 
     @property
     def env(self) -> NoReturn:  # type:ignore[override]
@@ -911,23 +674,4 @@ class Request(request.Request):
     # Private Helpers
     # ------------------------------------------------------------------------
 
-    @property
-    def _asgi_server(self) -> tuple[str, int]:
-        if not self._asgi_server_cached:
-            try:
-                # NOTE(kgriffs): Since the ASGI spec states that 'server'
-                #   can be any old iterable, we have to be careful to only
-                #   read it once and cache the result in case the
-                #   iterator is forward-only (not likely, but better
-                #   safe than sorry).
-                self._asgi_server_cached = tuple(self.scope['server'])
-            except (KeyError, TypeError):
-                # NOTE(kgriffs): Not found, or was None
-                default_port = 443 if self._secure_scheme else 80
-                self._asgi_server_cached = ('localhost', default_port)
 
-        return self._asgi_server_cached
-
-    @property
-    def _secure_scheme(self) -> bool:
-        return self.scheme == 'https' or self.scheme == 'wss'

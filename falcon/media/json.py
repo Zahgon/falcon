@@ -216,19 +216,11 @@ class JSONHandler(BaseHandler):
 
     # NOTE(kgriffs): Make content_type a kwarg to support the
     #   Request.render_body() shortcut optimization.
-    def _serialize_s(self, media: Any, content_type: str | None = None) -> bytes:
-        return self._dumps(media).encode()  # type: ignore[union-attr]
 
-    async def _serialize_async_s(self, media: Any, content_type: str | None) -> bytes:
-        return self._dumps(media).encode()  # type: ignore[union-attr]
 
     # NOTE(kgriffs): Make content_type a kwarg to support the
     #   Request.render_body() shortcut optimization.
-    def _serialize_b(self, media: Any, content_type: str | None = None) -> bytes:
-        return self._dumps(media)  # type: ignore[return-value]
 
-    async def _serialize_async_b(self, media: Any, content_type: str | None) -> bytes:
-        return self._dumps(media)  # type: ignore[return-value]
 
 
 class JSONHandlerWS(TextBaseHandlerWS):

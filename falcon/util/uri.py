@@ -82,49 +82,6 @@ def _create_str_encoder(
     allowed_chars_plus_percent = allowed_chars + '%'
     encode_char = _create_char_encoder(allowed_chars)
 
-    def encoder(uri: str) -> str:
-        # PERF(kgriffs): Very fast way to check, learned from urlib.quote
-        if not uri.rstrip(allowed_chars):
-            return uri
-
-        if check_is_escaped and not uri.rstrip(allowed_chars_plus_percent):
-            # NOTE(kgriffs): There's a good chance the string has already
-            # been escaped. Do one more check to increase our certainty.
-            # NOTE(minesja): Per issue #1872, there's only certain situations
-            # in which we should check again (ex. location, content_location,
-            # append_link). In all other cases we should allow characters that
-            # could appear escaped to still be encoded (ex. '%' would be encoded
-            # as '%25').
-            tokens = uri.split('%')
-            for token in tokens[1:]:
-                hex_octet = token[:2]
-
-                if not len(hex_octet) == 2:
-                    break
-
-                if not (hex_octet[0] in _HEX_DIGITS and hex_octet[1] in _HEX_DIGITS):
-                    break
-            else:
-                # NOTE(kgriffs): All percent-encoded sequences were
-                # valid, so assume that the string has already been
-                # encoded.
-                return uri
-
-            # NOTE(kgriffs): At this point we know there is at least
-            # one unallowed percent character. We are going to assume
-            # that everything should be encoded. If the string is
-            # partially encoded, the caller will need to normalize it
-            # before passing it in here.
-
-        encoded_uri = uri.encode()
-
-        # Use our map to encode each char and join the result into a new uri
-        #
-        # PERF(kgriffs): map() is faster than list comp or generator comp on
-        # CPython 3 (tested on CPython 3.5 and 3.7). A list comprehension
-        # can be faster on PyPy3, but the difference is on the order of
-        # nanoseconds in that case, so we aren't going to worry about it.
-        return ''.join(map(encode_char, encoded_uri))
 
     return encoder
 
@@ -233,38 +190,8 @@ Returns:
 """
 
 
-def _join_tokens_bytearray(tokens: list[bytes]) -> str:
-    decoded_uri = bytearray(tokens[0])
-    for token in tokens[1:]:
-        token_partial = token[:2]
-        try:
-            decoded_uri += _HEX_TO_BYTE[token_partial] + token[2:]
-        except KeyError:
-            # malformed percentage like "x=%" or "y=%+"
-            decoded_uri += b'%' + token
-
-    # Convert back to str
-    return decoded_uri.decode('utf-8', 'replace')
 
 
-def _join_tokens_list(tokens: list[bytes]) -> str:
-    decoded = tokens[:1]
-    # PERF(vytas): Do not copy list: a simple bool flag is fastest on PyPy JIT.
-    skip = True
-    for token in tokens:
-        if skip:
-            skip = False
-            continue
-
-        token_partial = token[:2]
-        try:
-            decoded.append(_HEX_TO_BYTE[token_partial] + token[2:])
-        except KeyError:
-            # malformed percentage like "x=%" or "y=%+"
-            decoded.append(b'%' + token)
-
-    # Convert back to str
-    return b''.join(decoded).decode('utf-8', 'replace')
 
 
 # PERF(vytas): The best method to join many byte strings depends on the Python

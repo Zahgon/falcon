@@ -76,27 +76,6 @@ class BufferedReader:
         self._exhausted = False
         self._iteration_started = False
 
-    async def _iter_normalized(
-        self, source: AsyncReadableIO | AsyncIterator[bytes]
-    ) -> AsyncIterator[bytes]:
-        chunk = b''
-        chunk_size = self._chunk_size
-
-        async for item in source:
-            chunk_len = len(chunk)
-            if chunk_len >= chunk_size:
-                self._consumed += chunk_len
-                yield chunk
-                chunk = item
-                continue
-
-            chunk += item
-
-        if chunk:
-            self._consumed += len(chunk)
-            yield chunk
-
-        self._exhausted = True
 
     async def _iter_with_buffer(self, size_hint: int = 0) -> AsyncIterator[bytes]:
         if self._buffer_len > self._buffer_pos:
@@ -112,74 +91,7 @@ class BufferedReader:
         async for chunk in self._source:
             yield chunk
 
-    async def _iter_delimited(
-        self, delimiter: bytes, size_hint: int = 0
-    ) -> AsyncIterator[bytes]:
-        delimiter_len_1 = len(delimiter) - 1
-        if not 0 <= delimiter_len_1 < self._chunk_size:
-            raise ValueError('delimiter length must be within [1, chunk_size]')
 
-        if self._buffer_len > self._buffer_pos:
-            pos = self._buffer.find(delimiter, self._buffer_pos)
-            if pos == 0:
-                return
-            if pos > 0:
-                if 0 < size_hint < pos - self._buffer_pos:
-                    buffer_pos = self._buffer_pos
-                    self._buffer_pos += size_hint
-                    yield self._buffer[buffer_pos : self._buffer_pos]
-                buffer_pos = self._buffer_pos
-                self._buffer_pos = pos
-                yield self._buffer[buffer_pos:pos]
-                return
-
-            if 0 < size_hint < (self._buffer_len - self._buffer_pos - delimiter_len_1):
-                buffer_pos = self._buffer_pos
-                self._buffer_pos += size_hint
-                yield self._buffer[buffer_pos : self._buffer_pos]
-
-        if self._buffer_pos > 0:
-            self._trim_buffer()
-
-        async for chunk in self._source:
-            offset = self._buffer_len - delimiter_len_1
-            if offset > 0:
-                fragment = self._buffer[offset:] + chunk[:delimiter_len_1]
-                pos = fragment.find(delimiter)
-                if pos < 0:
-                    output = self._buffer
-                    self._buffer = chunk
-                    self._buffer_len = len(chunk)
-                    yield output
-                else:
-                    self._buffer += chunk
-                    self._buffer_len += len(chunk)
-                    self._buffer_pos = offset + pos
-                    # PERF(vytas): local1 + local2 was faster than self._attr.
-                    # TODO(vytas): Verify this on 3.12+.
-                    yield self._buffer[: offset + pos]
-                    return
-            elif self._buffer:
-                self._buffer += chunk
-                self._buffer_len += len(chunk)
-            else:
-                self._buffer = chunk
-                self._buffer_len = len(chunk)
-
-            pos = self._buffer.find(delimiter)
-            if pos >= 0:  # pragma: no py39,py310 cover
-                if pos > 0:
-                    self._buffer_pos = pos
-                    yield self._buffer[:pos]
-                return
-
-        yield self._buffer
-
-    async def _consume_delimiter(self, delimiter: bytes) -> None:
-        delimiter_len = len(delimiter)
-        if await self.peek(delimiter_len) != delimiter:
-            raise DelimiterError('expected delimiter missing')
-        self._buffer_pos += delimiter_len
 
     def _prepend_buffer(self, chunk: bytes) -> None:
         if self._buffer_len > self._buffer_pos:
@@ -191,10 +103,6 @@ class BufferedReader:
 
         self._buffer_pos = 0
 
-    def _trim_buffer(self) -> None:
-        self._buffer = self._buffer[self._buffer_pos :]
-        self._buffer_len -= self._buffer_pos
-        self._buffer_pos = 0
 
     async def _read_from(
         self, source: AsyncIterator[bytes], size: int | None = -1
@@ -245,8 +153,6 @@ class BufferedReader:
 
         return result_bytes.getvalue()
 
-    def delimit(self, delimiter: bytes) -> BufferedReader:  # TODO: should se self
-        return type(self)(self._iter_delimited(delimiter), chunk_size=self._chunk_size)
 
     # -------------------------------------------------------------------------
     # Asynchronous IO interface.
@@ -266,39 +172,12 @@ class BufferedReader:
     async def exhaust(self) -> None:
         await self.pipe()
 
-    async def peek(self, size: int = -1) -> bytes:
-        if size < 0 or size > self._chunk_size:
-            size = self._chunk_size
-
-        if self._buffer_pos > 0:
-            self._trim_buffer()
-
-        if self._buffer_len < size:
-            async for chunk in self._source:
-                self._buffer += chunk
-                self._buffer_len = len(self._buffer)
-                if self._buffer_len >= size:  # pragma: no py39,py310 cover
-                    break
-
-        return self._buffer[:size]  # pragma: no py314 cover
 
     async def pipe(self, destination: AsyncWritableIO | None = None) -> None:
         async for chunk in self._iter_with_buffer():
             if destination is not None:
                 await destination.write(chunk)
 
-    async def pipe_until(
-        self,
-        delimiter: bytes,
-        destination: AsyncWritableIO | None = None,
-        consume_delimiter: bool = False,
-    ) -> None:
-        async for chunk in self._iter_delimited(delimiter):
-            if destination is not None:
-                await destination.write(chunk)
-
-        if consume_delimiter:
-            await self._consume_delimiter(delimiter)
 
     async def read(self, size: int | None = -1) -> bytes:
         return await self._read_from(self._iter_with_buffer(size_hint=size or 0), size)
@@ -318,17 +197,6 @@ class BufferedReader:
         """
         return await self._read_from(self._iter_with_buffer())
 
-    async def read_until(
-        self, delimiter: bytes, size: int = -1, consume_delimiter: bool = False
-    ) -> bytes:
-        result = await self._read_from(
-            self._iter_delimited(delimiter, size_hint=size or 0), size
-        )
-
-        if consume_delimiter:
-            await self._consume_delimiter(delimiter)
-
-        return result
 
     # -------------------------------------------------------------------------
     # These methods are included to improve compatibility with Python's
@@ -342,7 +210,7 @@ class BufferedReader:
     @property
     def eof(self) -> bool:
         """Whether the stream is at EOF."""
-        return self._exhausted and self._buffer_len == self._buffer_pos
+        pass
 
     def fileno(self) -> NoReturn:
         """Raise an instance of OSError since a file descriptor is not used."""
@@ -350,23 +218,23 @@ class BufferedReader:
 
     def isatty(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def readable(self) -> bool:
         """Return ``True`` always."""
-        return True
+        pass
 
     def seekable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def writable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def tell(self) -> int:
         """Return the number of bytes read from the stream so far."""
-        return self._consumed - (self._buffer_len - self._buffer_pos)
+        pass
 
 
 class AsyncWritableIO(Protocol):

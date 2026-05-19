@@ -224,40 +224,7 @@ def inspect_compiled_router(router: CompiledRouter) -> list[RouteInfo]:
     Returns:
         list[RouteInfo]: A list of :class:`~.RouteInfo`.
     """
-
-    def _traverse(roots: list[CompiledRouterNode], parent: str) -> None:
-        for root in roots:
-            path = parent + '/' + root.raw_segment
-            if root.resource is not None:
-                methods = []
-                if root.method_map:
-                    for method, func in root.method_map.items():
-                        if isinstance(func, partial):
-                            real_func = func.func
-                        else:
-                            real_func = func
-
-                        source_info = _get_source_info(real_func)
-                        internal = _is_internal(real_func)
-                        assert source_info, (
-                            'This is for type checking only, as here source '
-                            'info will always be a string'
-                        )
-                        method_info = RouteMethodInfo(
-                            method, source_info, real_func.__name__, internal
-                        )
-                        methods.append(method_info)
-                source_info, class_name = _get_source_info_and_name(root.resource)
-                assert source_info
-                route_info = RouteInfo(path, class_name, source_info, methods)
-                routes.append(route_info)
-
-            if root.children:
-                _traverse(root.children, path)
-
-    routes: list[RouteInfo] = []
-    _traverse(router._roots, '')
-    return routes
+    pass
 
 
 # ------------------------------------------------------------------------
@@ -615,166 +582,57 @@ class StringVisitor(InspectVisitor):
     @property
     def tab(self) -> str:
         """Get the current tabulation."""
-        return ' ' * self.indent
+        pass
 
     def visit_route_method(self, route_method: RouteMethodInfo) -> str:
         """Visit a RouteMethodInfo instance. Usually called by `process`."""
-        text = '{0.method} - {0.function_name}'.format(route_method)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(route_method)
-        return text
+        pass
 
     def _methods_to_string(
         self, methods: list[RouteMethodInfo] | list[MiddlewareMethodInfo]
     ) -> str:
         """Return a string from the list of methods."""
-        tab = self.tab + ' ' * 3
-        filtered_methods = _filter_internal(methods, self.internal)
-        if not filtered_methods:
-            return ''
-        text_list = [self.process(m) for m in filtered_methods]
-        method_text = ['{}├── {}'.format(tab, m) for m in text_list[:-1]]
-        method_text += ['{}└── {}'.format(tab, m) for m in text_list[-1:]]
-        return '\n'.join(method_text)
+        pass
 
     def visit_route(self, route: RouteInfo) -> str:
         """Visit a RouteInfo instance. Usually called by `process`."""
-        text = '{0}⇒ {1.path} - {1.class_name}'.format(self.tab, route)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(route)
-
-        method_text = self._methods_to_string(route.methods)
-        if not method_text:
-            return text
-
-        return '{}:\n{}'.format(text, method_text)
+        pass
 
     def visit_static_route(self, static_route: StaticRouteInfo) -> str:
         """Visit a StaticRouteInfo instance. Usually called by `process`."""
-        text = '{0}↦ {1.prefix} {1.directory}'.format(self.tab, static_route)
-        if static_route.fallback_filename:
-            text += ' [{0.fallback_filename}]'.format(static_route)
-        return text
+        pass
 
     def visit_sink(self, sink: SinkInfo) -> str:
         """Visit a SinkInfo instance. Usually called by `process`."""
-        text = '{0}⇥ {1.prefix} {1.name}'.format(self.tab, sink)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(sink)
-        return text
+        pass
 
     def visit_error_handler(self, error_handler: ErrorHandlerInfo) -> str:
         """Visit a ErrorHandlerInfo instance. Usually called by `process`."""
-        text = '{0}⇜ {1.error} {1.name}'.format(self.tab, error_handler)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(error_handler)
-        return text
+        pass
 
     def visit_middleware_method(self, middleware_method: MiddlewareMethodInfo) -> str:
         """Visit a MiddlewareMethodInfo instance. Usually called by `process`."""
-        text = '{0.function_name}'.format(middleware_method)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(middleware_method)
-        return text
+        pass
 
     def visit_middleware_class(self, middleware_class: MiddlewareClassInfo) -> str:
         """Visit a ErrorHandlerInfo instance. Usually called by `process`."""
-        text = '{0}↣ {1.name}'.format(self.tab, middleware_class)
-        if self.verbose:
-            text += ' ({0.source_info})'.format(middleware_class)
-
-        method_text = self._methods_to_string(middleware_class.methods)
-        if not method_text:
-            return text
-
-        return '{}:\n{}'.format(text, method_text)
+        pass
 
     def visit_middleware_tree_item(self, mti: MiddlewareTreeItemInfo) -> str:
         """Visit a MiddlewareTreeItemInfo instance. Usually called by `process`."""
-        symbol = mti._symbols.get(mti.name, '→')
-        return '{0}{1} {2.class_name}.{2.name}'.format(self.tab, symbol, mti)
+        pass
 
     def visit_middleware_tree(self, m_tree: MiddlewareTreeInfo) -> str:
         """Visit a MiddlewareTreeInfo instance. Usually called by `process`."""
-        before = len(m_tree.request) + len(m_tree.resource)
-        after = len(m_tree.response)
-
-        if before + after == 0:
-            return ''
-
-        each = 2
-        initial = self.indent
-        if after > before:
-            self.indent += each * (after - before)
-
-        text = []
-        for r in m_tree.request:
-            text.append(self.process(r))
-            self.indent += each
-        if text:
-            text.append('')
-        for r in m_tree.resource:
-            text.append(self.process(r))
-            self.indent += each
-
-        if m_tree.resource or not text:
-            text.append('')
-        self.indent += each
-        text.append('{}├── Process route responder'.format(self.tab))
-        self.indent -= each
-        if m_tree.response:
-            text.append('')
-
-        for r in m_tree.response:
-            self.indent -= each
-            text.append(self.process(r))
-
-        self.indent = initial
-        return '\n'.join(text)
+        pass
 
     def visit_middleware(self, middleware: MiddlewareInfo) -> str:
         """Visit a MiddlewareInfo instance. Usually called by `process`."""
-        text = self.process(middleware.middleware_tree)
-        if self.verbose:
-            self.indent += 4
-            m_text = '\n'.join(self.process(m) for m in middleware.middleware_classes)
-            self.indent -= 4
-            if m_text:
-                text += '\n{}- Middleware classes:\n{}'.format(self.tab, m_text)
-
-        return text
+        pass
 
     def visit_app(self, app: AppInfo) -> str:
         """Visit a AppInfo instance. Usually called by `process`."""
-
-        type_ = 'ASGI' if app.asgi else 'WSGI'
-        self.indent = 4
-        text = '{} ({})'.format(self.name or 'Falcon App', type_)
-
-        if app.routes:
-            routes = '\n'.join(self.process(r) for r in app.routes)
-            text += '\n• Routes:\n{}'.format(routes)
-
-        middleware_text = self.process(app.middleware)
-        if middleware_text:
-            text += '\n• Middleware ({}):\n{}'.format(
-                app.middleware.independent_text, middleware_text
-            )
-
-        if app.static_routes:
-            static_routes = '\n'.join(self.process(sr) for sr in app.static_routes)
-            text += '\n• Static routes:\n{}'.format(static_routes)
-
-        if app.sinks:
-            sinks = '\n'.join(self.process(s) for s in app.sinks)
-            text += '\n• Sinks:\n{}'.format(sinks)
-
-        errors = _filter_internal(app.error_handlers, self.internal)
-        if errors:
-            errs = '\n'.join(self.process(e) for e in errors)
-            text += '\n• Error handlers:\n{}'.format(errs)
-
-        return text
+        pass
 
 
 # ------------------------------------------------------------------------
@@ -828,6 +686,4 @@ def _filter_internal(
     return_internal: bool,
 ) -> Iterable[_Traversable] | list[_Traversable]:
     """Filter the internal elements of an iterable."""
-    if return_internal:
-        return iterable
-    return [el for el in iterable if not el.internal]
+    pass

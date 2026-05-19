@@ -28,15 +28,7 @@ def _open_file(file_path: str | Path) -> tuple[io.BufferedReader, os.stat_result
     Returns:
         tuple: Tuple of (BufferedReader, stat_result).
     """
-    fh: io.BufferedReader | None = None
-    try:
-        fh = io.open(file_path, 'rb')  # noqa: UP020
-        st = os.fstat(fh.fileno())
-    except OSError:
-        if fh is not None:
-            fh.close()
-        raise falcon.HTTPNotFound()
-    return fh, st
+    pass
 
 
 def _set_range(
@@ -55,62 +47,14 @@ def _set_range(
             possibly bounded, and the content-range will be a tuple of
             (start, end, size).
     """
-    size = st.st_size
-    if req_range is None:
-        return fh, size, None
-
-    start, end = req_range
-    if size == 0:
-        # NOTE(tipabu): Ignore Range headers for zero-byte files; just serve
-        #   the empty body since Content-Range can't be used to express a
-        #   zero-byte body.
-        return fh, 0, None
-
-    if start < 0 and end == -1:
-        # NOTE(tipabu): Special case: only want the last N bytes.
-        start = max(start, -size)
-        fh.seek(start, os.SEEK_END)
-        # NOTE(vytas): Wrap in order to prevent sendfile from being used, as
-        #   its implementation was found to be buggy in many popular WSGI
-        #   servers for open files with a non-zero offset.
-        return _BoundedFile(fh, -start), -start, (size + start, size - 1, size)
-
-    if start >= size:
-        fh.close()
-        raise falcon.HTTPRangeNotSatisfiable(size)
-
-    fh.seek(start)
-    if end == -1:
-        # NOTE(vytas): Wrap in order to prevent sendfile from being used, as
-        #   its implementation was found to be buggy in many popular WSGI
-        #   servers for open files with a non-zero offset.
-        length = size - start
-        return _BoundedFile(fh, length), length, (start, size - 1, size)
-
-    end = min(end, size - 1)
-    length = end - start + 1
-    return _BoundedFile(fh, length), length, (start, end, size)
+    pass
 
 
 def _is_not_modified(
     req: falcon.Request, current_etag: str, last_modified: datetime
 ) -> bool:
     """Check whether the requested resource can be served with 304 Not Modified."""
-
-    # NOTE(Cycloctane): RFC 9110 Section 13.1.3: A recipient MUST ignore
-    #   If-Modified-Since if the request contains an If-None-Match header
-    #   field. See also:
-    #   https://www.rfc-editor.org/rfc/rfc9110#section-13.1.3-5
-    #   https://www.rfc-editor.org/rfc/rfc9110#section-13.2.2
-    if req.if_none_match is not None:
-        return (len(req.if_none_match) == 1 and req.if_none_match[0] == '*') or any(
-            current_etag == etag for etag in req.if_none_match
-        )
-
-    if req.if_modified_since is not None:
-        return last_modified <= req.if_modified_since
-
-    return False
+    pass
 
 
 class _BoundedFile:

@@ -65,4 +65,4 @@ class StartResponseMock:
     @property
     def call_count(self) -> int:
         """Number of times `start_response` was called."""
-        return self._called
+        pass

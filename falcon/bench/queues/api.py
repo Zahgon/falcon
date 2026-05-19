@@ -21,11 +21,7 @@ from falcon.bench.queues import stats
 
 
 class RequestIDComponent:
-    def process_request(self, req, resp):
-        req.context.request_id = '<generate ID>'
 
-    def process_response(self, req, resp, resource, req_succeeded):
-        resp.set_header('X-Request-ID', req.context.request_id)
 
 
 class CannedResponseComponent:
@@ -33,15 +29,6 @@ class CannedResponseComponent:
         self._body = body
         self._headers = headers
 
-    def process_response(self, req, resp, resource, req_succeeded):
-        user_agent = req.user_agent  # NOQA
-        limit = req.get_param('limit') or '10'  # NOQA
-
-        resp.status = falcon.HTTP_200
-        resp.data = self._body
-        resp.set_headers(self._headers)
-        resp.vary = ('X-Auth-Token', 'Accept-Encoding')
-        resp.content_range = (0, len(self._body), len(self._body) + 100)
 
 
 def create(body, headers):

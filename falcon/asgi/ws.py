@@ -114,34 +114,28 @@ class WebSocket:
         """``True`` if the WebSocket connection has not yet been accepted,
         ``False`` otherwise.
         """  # noqa: D205
-        return self._state == _WebSocketState.HANDSHAKE
+        pass
 
     @property
     def closed(self) -> bool:
         """``True`` if the WebSocket connection has been closed by the server or the
         client has disconnected.
         """  # noqa: D205
-        return (
-            self._state == _WebSocketState.CLOSED
-            or self._buffered_receiver.client_disconnected
-        )
+        pass
 
     @property
     def ready(self) -> bool:
         """``True`` if the WebSocket connection has been accepted and the client is
         still connected, ``False`` otherwise.
         """  # noqa: D205
-        return (
-            self._state == _WebSocketState.ACCEPTED
-            and not self._buffered_receiver.client_disconnected
-        )
+        pass
 
     @property
     def supports_accept_headers(self) -> bool:
         """``True`` if the ASGI server hosting the app supports sending headers when
         accepting the WebSocket connection, ``False`` otherwise.
         """  # noqa: D205
-        return self._supports_accept_headers
+        pass
 
     async def accept(
         self,
@@ -335,23 +329,7 @@ class WebSocket:
                     falcon.WebSocketPayloadType.TEXT
                     falcon.WebSocketPayloadType.BINARY
         """
-
-        self._require_accepted()
-
-        if payload_type is WebSocketPayloadType.TEXT:
-            await self._send(
-                {
-                    'type': EventType.WS_SEND,
-                    'text': self._mh_text_serialize(media),
-                }
-            )
-        else:
-            await self._send(
-                {
-                    'type': EventType.WS_SEND,
-                    'bytes': self._mh_bin_serialize(media),
-                }
-            )
+        pass
 
     async def send_text(self, payload: str) -> None:
         """Send a message to the client with a Unicode string payload.
@@ -380,20 +358,7 @@ class WebSocket:
         Arguments:
             payload (bytes | bytearray | memoryview): The binary data to send.
         """
-
-        self._require_accepted()
-        # NOTE(kgriffs): We have to check ourselves because some ASGI
-        #   servers are not very strict which can lead to hard-to-debug
-        #   errors.
-        if not isinstance(payload, (bytes, bytearray, memoryview)):
-            raise TypeError('payload must be a byte string')
-
-        await self._send(
-            {
-                'type': EventType.WS_SEND,
-                'bytes': bytes(payload),
-            }
-        )
+        pass
 
     async def receive_text(self) -> str:
         """Receive a message from the client with a Unicode string payload.
@@ -401,24 +366,7 @@ class WebSocket:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
-
-        self._require_accepted()
-
-        event = await self._receive()
-
-        # PERF(kgriffs): When we normally expect the key to be
-        #   present, this pattern is faster than get()
-        try:
-            text = event['text']
-        except KeyError:
-            text = None
-
-        # NOTE(kgriffs): Even if the key is present, it may be None
-        if text is None:
-            raise errors.PayloadTypeError('Missing TEXT (0x01) payload')
-
-        # TODO(0xMattB): Implement advanced typing to type as 'str' (see PR #2599)
-        return text  # type: ignore[no-any-return]
+        pass
 
     async def receive_data(self) -> bytes:
         """Receive a message from the client with a binary data payload.
@@ -426,23 +374,7 @@ class WebSocket:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
-
-        self._require_accepted()
-
-        event = await self._receive()
-
-        # PERF(kgriffs): When we normally expect the key to be
-        #   present, EAFP is faster than get()
-        try:
-            data = event['bytes']
-        except KeyError:
-            data = None
-
-        # NOTE(kgriffs): Even if the key is present, it may be None
-        if data is None:
-            raise errors.PayloadTypeError('Missing BINARY (0x02) payload')
-
-        return data  # type: ignore[no-any-return]
+        pass
 
     async def receive_media(self) -> object:
         """Receive a deserialized object from the client.
@@ -450,31 +382,7 @@ class WebSocket:
         The incoming payload type determines the media handler that will be used
         to deserialize the object (see also: :ref:`ws_media_handlers`).
         """
-
-        self._require_accepted()
-
-        event = await self._receive()
-
-        # NOTE(kgriffs): Most likely case is going to be JSON via text
-        #   payload, so try that first.
-        text = event.get('text')
-        if text is not None:
-            return self._mh_text_deserialize(text)
-
-        # PERF(kgriffs): At this point there better be a 'bytes' key, so
-        #   use EAFP this time.
-        try:
-            data = event['bytes']
-        except KeyError:
-            data = None
-
-        # NOTE(kgriffs): Even if the key is present, it may be None
-        if data is None:
-            raise errors.PayloadTypeError(
-                'Message did not contain either a TEXT (0x01) or BINARY (0x02) payload'
-            )
-
-        return self._mh_bin_deserialize(data)
+        pass
 
     async def _send(self, msg: AsgiSendMsg) -> None:
         if self._buffered_receiver.client_disconnected:
@@ -627,15 +535,6 @@ class WebSocketOptions:
         (3011, 'Internal Server Error'),
     )
 
-    @classmethod
-    def _init_default_close_reasons(cls) -> dict[int, str]:
-        reasons = dict(cls._STANDARD_CLOSE_REASONS)
-        for status_constant in dir(status_codes):
-            if 'HTTP_100' <= status_constant < 'HTTP_599':
-                status_line = getattr(status_codes, status_constant)
-                status_code, _, phrase = status_line.partition(' ')
-                reasons[http_status_to_ws_code(int(status_code))] = phrase
-        return reasons
 
     def __init__(self) -> None:
         try:
@@ -737,56 +636,6 @@ class _BufferedReceiver:
 
         self._pump_task = None
 
-    async def receive(self) -> AsgiEvent:
-        # NOTE(kgriffs): Since this class is only used internally, we
-        #   use an assertion to mitigate against framework bugs.
-        #
-        #   receive() may not be called again while another coroutine
-        #   is already waiting for the next message.
-        assert self._pop_message_waiter is None
-        assert self._pump_task is not None
-
-        # NOTE(kgriffs): Wait for a message if none are available. This pattern
-        #   was borrowed from the websockets.protocol module.
-        while not self._messages:
-            # --------------------------------------------------------------------------
-            # NOTE(kgriffs): The pattern below was borrowed from the websockets.protocol
-            #   module under the BSD 3-Clause "New" or "Revised" License.
-            #
-            #   Ref: https://github.com/aaugustin/websockets/blob/master/src/websockets/protocol.py  # noqa E501
-            #
-            # --------------------------------------------------------------------------
-
-            # PERF(kgriffs): Using a bare future like this seems to be
-            #   slightly more efficient vs. something like asyncio.Event
-            pop_message_waiter = self._loop.create_future()
-            self._pop_message_waiter = pop_message_waiter
-
-            try:
-                await asyncio.wait(
-                    [pop_message_waiter, self._pump_task],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-            finally:
-                self._pop_message_waiter = None
-
-            if not pop_message_waiter.done():
-                # NOTE(kgriffs): asyncio.wait(...) exited because
-                #   self._pump_task completed before receiving a
-                #   new message.
-                pop_message_waiter.cancel()
-                return {
-                    'type': EventType.WS_DISCONNECT,
-                }
-
-        message = self._messages.popleft()
-
-        # Notify _pump()
-        if self._put_message_waiter is not None:
-            self._put_message_waiter.set_result(None)
-            self._put_message_waiter = None
-
-        return message
 
     async def _pump(self) -> None:
         while not self.client_disconnected:

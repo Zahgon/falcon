@@ -89,15 +89,15 @@ class BoundedStream(io.IOBase):
 
     def readable(self) -> bool:
         """Return ``True`` always."""
-        return True
+        pass
 
     def seekable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def writable(self) -> bool:
         """Return ``False`` always."""
-        return False
+        pass
 
     def read(self, size: int | None = None) -> bytes:
         """Read from the stream.
@@ -124,8 +124,7 @@ class BoundedStream(io.IOBase):
             bytes: Data read from the stream.
 
         """
-
-        return self._read(limit, self.stream.readline)
+        pass
 
     def readlines(self, hint: int | None = None) -> list[bytes]:
         """Read lines from the stream.
@@ -138,8 +137,7 @@ class BoundedStream(io.IOBase):
             bytes: Data read from the stream.
 
         """
-
-        return self._read(hint, self.stream.readlines)
+        pass
 
     def write(self, data: bytes) -> None:
         """Raise OSError always; writing is not supported."""
@@ -165,7 +163,7 @@ class BoundedStream(io.IOBase):
         """``True`` if there is no more data to read from the stream,
         otherwise ``False``.
         """  # noqa: D205
-        return self._bytes_remaining <= 0
+        pass
 
     @property
     # NOTE(caselit): Deprecated long ago. Warns since 4.0.
@@ -175,7 +173,7 @@ class BoundedStream(io.IOBase):
     )
     def is_exhausted(self) -> bool:
         """Deprecated alias for `eof`."""
-        return self.eof
+        pass
 
 
 # NOTE(kgriffs): Alias for backwards-compat

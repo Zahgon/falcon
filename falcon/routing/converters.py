@@ -91,24 +91,6 @@ class IntConverter(BaseConverter):
         self._min = min
         self._max = max
 
-    def convert(self, value: str) -> int | None:
-        if self._num_digits is not None and len(value) != self._num_digits:
-            return None
-
-        # NOTE(kgriffs): int() will accept numbers with preceding or
-        #   trailing whitespace, so we need to do our own check. Using
-        #   strip() is faster than either a regex or a series of or'd
-        #   membership checks via "in", esp. as the length of contiguous
-        #   numbers in the value grows.
-        if value.strip() != value:
-            return None
-
-        try:
-            converted = int(value)
-        except ValueError:
-            return None
-
-        return _validate_min_max_value(self, converted)
 
 
 @overload
@@ -121,15 +103,6 @@ def _validate_min_max_value(
 ) -> float | None: ...
 
 
-def _validate_min_max_value(
-    converter: IntConverter | FloatConverter, value: int | float
-) -> int | float | None:
-    if converter._min is not None and value < converter._min:
-        return None
-    if converter._max is not None and value > converter._max:
-        return None
-
-    return value
 
 
 class FloatConverter(BaseConverter):
@@ -159,20 +132,6 @@ class FloatConverter(BaseConverter):
         self._max = max
         self._finite = finite if finite is not None else True
 
-    def convert(self, value: str) -> float | None:
-        if value.strip() != value:
-            return None
-
-        try:
-            converted = float(value)
-
-            if self._finite and not isfinite(converted):
-                return None
-
-        except ValueError:
-            return None
-
-        return _validate_min_max_value(self, converted)
 
 
 class DateTimeConverter(BaseConverter):
@@ -198,11 +157,6 @@ class DateTimeConverter(BaseConverter):
     def __init__(self, format_string: str = '%Y-%m-%dT%H:%M:%S%z') -> None:
         self._format_string = format_string
 
-    def convert(self, value: str) -> datetime | None:
-        try:
-            return strptime(value, self._format_string)
-        except ValueError:
-            return None
 
 
 class UUIDConverter(BaseConverter):
@@ -215,11 +169,6 @@ class UUIDConverter(BaseConverter):
     Note, however, that hyphens and the URN prefix are optional.
     """
 
-    def convert(self, value: str) -> uuid.UUID | None:
-        try:
-            return uuid.UUID(value)
-        except ValueError:
-            return None
 
 
 class PathConverter(BaseConverter):
@@ -245,8 +194,6 @@ class PathConverter(BaseConverter):
 
     CONSUME_MULTIPLE_SEGMENTS = True
 
-    def convert(self, value: Iterable[str]) -> str:
-        return '/'.join(value)
 
 
 BUILTIN = (

@@ -88,9 +88,6 @@ class StartResponseMockLite:
         self.headers = headers
         self.exc_info = exc_info
 
-    @property
-    def call_count(self):
-        return self._called
 
 
 def bench(func, iterations, stat_memory):
@@ -225,9 +222,6 @@ def create_bench(name, env):
         app(env, srmock)
         assert srmock.status == '200 OK'
 
-    def bench_generator():
-        exhaust(app(env, srmock))
-        assert srmock.status == '200 OK'
 
     if inspect.isgeneratorfunction(app):
         return bench_generator
@@ -248,8 +242,6 @@ def round_to_int(dec):
     return int(dec.to_integral_value())
 
 
-def avg(array):
-    return sum(array) / len(array)
 
 
 def hello_env():

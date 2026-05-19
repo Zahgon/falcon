@@ -563,7 +563,7 @@ class App(Generic[_ReqT, _RespT]):
 
         See also: :ref:`CompiledRouterOptions <compiled_router_options>`.
         """
-        return self._router.options
+        pass
 
     def add_middleware(
         self,
@@ -987,11 +987,6 @@ class App(Generic[_ReqT, _RespT]):
         def wrap_old_handler(
             old_handler: Callable[..., Any],
         ) -> ErrorHandler[_ReqT, _RespT]:
-            @wraps(old_handler)
-            def handler(
-                req: _ReqT, resp: _RespT, ex: Exception, params: dict[str, Any]
-            ) -> None:
-                old_handler(ex, req, resp, params)
 
             return handler  # type: ignore[return-value]
 
@@ -1080,8 +1075,7 @@ class App(Generic[_ReqT, _RespT]):
                 ``falcon.HTTPError``.
 
         """
-
-        self._serialize_error = serializer
+        pass
 
     # ------------------------------------------------------------------------
     # Helpers that require self
@@ -1125,116 +1119,23 @@ class App(Generic[_ReqT, _RespT]):
             the responder callable element of the returned tuple will be
             `falcon.responder.path_not_found`
         """
-
-        path = req.path
-        method = 'WEBSOCKET' if req.is_websocket else req.method
-        uri_template = None
-
-        route = self._router_search(path, req=req)
-
-        if route is not None:
-            try:
-                resource, method_map, params, uri_template = route
-            except ValueError:
-                # NOTE(kgriffs): Older routers may not return the
-                # template. But for performance reasons they should at
-                # least return None if they don't support it.
-                resource, method_map, params = route  # type: ignore[misc]
-        else:
-            # NOTE(kgriffs): Older routers may indicate that no route
-            # was found by returning (None, None, None). Therefore, we
-            # normalize resource as the flag to indicate whether or not
-            # a route was found, for the sake of backwards-compat.
-            resource = None
-
-        if resource is not None:
-            try:
-                responder = method_map[method]
-            except KeyError:
-                # NOTE(kgriffs): Dirty hack! We use __class__ here to avoid
-                #   binding self to the default responder method. We could
-                #   decorate the function itself with @staticmethod, but it
-                #   would perhaps be less obvious to the reader why this is
-                #   needed when just looking at the code in the reponder
-                #   module, so we just grab it directly here.
-                responder = self.__class__._default_responder_bad_request
-        else:
-            params = {}
-
-            for matcher, obj, is_sink in self._sink_and_static_routes:
-                m = matcher.match(path)
-                if m:
-                    if is_sink:
-                        params = m.groupdict()  # type: ignore[union-attr]
-                    responder = obj  # type: ignore[assignment,unused-ignore]
-
-                    break
-            else:
-                responder = self.__class__._default_responder_path_not_found
-
-        return (responder, params, resource, uri_template)
+        pass
 
     def _compose_status_response(
         self, req: _ReqT, resp: _RespT, http_status: HTTPStatus
     ) -> None:
         """Compose a response for the given HTTPStatus instance."""
-
-        # PERF(kgriffs): The code to set the status and headers is identical
-        # to that used in _compose_error_response(), but refactoring in the
-        # name of DRY isn't worth the extra CPU cycles.
-        resp.status = http_status.status
-
-        if http_status.headers is not None:
-            resp.set_headers(http_status.headers)
-
-        # NOTE(kgriffs): If http_status.text is None, that's OK because
-        # it's acceptable to set resp.text to None (to indicate no body).
-        resp.text = http_status.text
+        pass
 
     def _compose_error_response(
         self, req: _ReqT, resp: _RespT, error: HTTPError
     ) -> None:
         """Compose a response for the given HTTPError instance."""
+        pass
 
-        resp.status = error.status
 
-        if error.headers is not None:
-            resp.set_headers(error.headers)
 
-        self._serialize_error(req, resp, error)
 
-    def _http_status_handler(
-        self, req: _ReqT, resp: _RespT, status: HTTPStatus, params: dict[str, Any]
-    ) -> None:
-        self._compose_status_response(req, resp, status)
-
-    def _http_error_handler(
-        self, req: _ReqT, resp: _RespT, error: HTTPError, params: dict[str, Any]
-    ) -> None:
-        self._compose_error_response(req, resp, error)
-
-    def _python_error_handler(
-        self, req: _ReqT, resp: _RespT, error: Exception, params: dict[str, Any]
-    ) -> None:
-        req.log_error(traceback.format_exc())
-        self._compose_error_response(req, resp, HTTPInternalServerError())
-
-    def _find_error_handler(self, ex: Exception) -> ErrorHandler[_ReqT, _RespT] | None:
-        # NOTE(csojinb): The `__mro__` class attribute returns the method
-        # resolution order tuple, i.e. the complete linear inheritance chain
-        # ``(type(ex), ..., object)``. For a valid exception class, the last
-        # two entries in the tuple will always be ``BaseException``and
-        # ``object``, so here we iterate over the lineage of exception types,
-        # from most to least specific.
-
-        # PERF(csojinb): The expression ``type(ex).__mro__[:-1]`` here is not
-        # super readable, but we inline it to avoid function call overhead.
-        for exc in type(ex).__mro__[:-1]:
-            handler = self._error_handlers.get(exc)
-
-            if handler is not None:
-                return handler
-        return None
 
     def _handle_exception(
         self, req: _ReqT, resp: _RespT, ex: Exception, params: dict[str, Any]
@@ -1254,25 +1155,7 @@ class App(Generic[_ReqT, _RespT]):
             bool: ``True`` if a handler was found and called for the
             exception, ``False`` otherwise.
         """
-        err_handler = self._find_error_handler(ex)
-
-        # NOTE(caselit): Reset body, data and media before calling the handler
-        resp.text = resp.data = resp.media = None
-        if err_handler is not None:
-            try:
-                err_handler(req, resp, ex, params)
-            except HTTPStatus as status:
-                self._compose_status_response(req, resp, status)
-            except HTTPError as error:
-                self._compose_error_response(req, resp, error)
-
-            return True
-
-        # NOTE(kgriffs): No error handlers are defined for ex
-        # and it is not one of (HTTPStatus, HTTPError), since it
-        # would have matched one of the corresponding default
-        # handlers.
-        return False
+        pass
 
     # PERF(kgriffs): Moved from api_helpers since it is slightly faster
     # to call using self, and this function is called for most
@@ -1303,35 +1186,7 @@ class App(Generic[_ReqT, _RespT]):
                 * Otherwise, returns ([], 0)
 
         """
-
-        data: bytes | None = resp.render_body()
-        if data is not None:
-            return [data], len(data)
-
-        stream = resp.stream
-        if stream is not None:
-            # NOTE(kgriffs): Heuristic to quickly check if stream is
-            # file-like. Not perfect, but should be good enough until
-            # proven otherwise.
-            if hasattr(stream, 'read'):
-                if wsgi_file_wrapper is not None:
-                    # TODO(kgriffs): Make block size configurable at the
-                    # global level, pending experimentation to see how
-                    # useful that would be. See also the discussion on
-                    # this GitHub PR:
-                    # https://github.com/falconry/falcon/pull/249#discussion_r11269730
-                    iterable = wsgi_file_wrapper(stream, self._STREAM_BLOCK_SIZE)  # type: ignore[arg-type]
-                else:
-                    iterable = helpers.CloseableStreamIterator(
-                        stream,  # type: ignore[arg-type]
-                        self._STREAM_BLOCK_SIZE,
-                    )
-            else:
-                iterable = stream
-
-            return iterable, None
-
-        return [], 0
+        pass
 
     def _update_sink_and_static_routes(self) -> None:
         if self._sink_before_static_route:

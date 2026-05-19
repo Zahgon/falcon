@@ -91,21 +91,6 @@ class ASGILifespanEventEmitter:
         self._state = 0
         self._shutting_down = shutting_down
 
-    async def emit(self) -> AsgiEvent:
-        if self._state == 0:
-            self._state += 1
-            return {'type': EventType.LIFESPAN_STARTUP}
-
-        if self._state == 1:
-            self._state += 1
-            # NOTE(kgriffs): This verifies the app ignores events it does
-            #   not recognize.
-            return {'type': 'lifespan._nonstandard_event'}
-
-        async with self._shutting_down:
-            await self._shutting_down.wait()
-
-        return {'type': EventType.LIFESPAN_SHUTDOWN}
 
     __call__ = emit
 
@@ -176,7 +161,7 @@ class ASGIRequestEventEmitter:
         """Returns ``True`` if the simulated client connection is in a
         "disconnected" state.
         """  # noqa: D205
-        return self._disconnected or (self._disconnect_at <= time.time())
+        pass
 
     def disconnect(self, exhaust_body: bool | None = None) -> None:
         """Set the client connection state to disconnected.
@@ -195,89 +180,9 @@ class ASGIRequestEventEmitter:
 
         self._disconnected = True
 
-    async def emit(self) -> AsgiEvent:
-        # NOTE(kgriffs): Special case: if we are immediately disconnected,
-        #   the first event should be 'http.disconnect'
-        if self._disconnect_at == 0:
-            return {'type': EventType.HTTP_DISCONNECT}
-
-        #
-        # NOTE(kgriffs): Based on my reading of the ASGI spec, at least one
-        #   'http.request' event should be emitted before 'http.disconnect'
-        #   for normal requests. However, the server may choose to
-        #   immediately abandon a connection for some reason, in which case
-        #   an 'http.request' event may never be sent.
-        #
-        #   See also: https://asgi.readthedocs.io/en/latest/specs/main.html#events
-        #
-        if self._body is None or not self._exhaust_body:
-            # NOTE(kgriffs): When there are no more events, an ASGI
-            #   server will hang until the client connection
-            #   disconnects.
-            while not self.disconnected:
-                await asyncio.sleep(0.001)
-
-            return {'type': EventType.HTTP_DISCONNECT}
-
-        event: dict[str, Any] = {'type': EventType.HTTP_REQUEST}
-
-        if self._emit_empty_chunks:
-            # NOTE(kgriffs): Return a couple variations on empty chunks
-            #   every time, to ensure test coverage.
-            if not self._emitted_empty_chunk_a:
-                self._emitted_empty_chunk_a = True
-                event['more_body'] = True
-                return event
-
-            if not self._emitted_empty_chunk_b:
-                self._emitted_empty_chunk_b = True
-                event['more_body'] = True
-                event['body'] = b''
-                return event
-
-            # NOTE(kgriffs): Part of the time just return an
-            #   empty chunk to make sure the app handles that
-            #   correctly.
-            if self._toggle_branch('return_empty_chunk'):
-                event['more_body'] = True
-
-                # NOTE(kgriffs): Since ASGI specifies that
-                #   'body' is optional, we toggle whether
-                #   or not to explicitly set it to b'' to ensure
-                #   the app handles both correctly.
-                if self._toggle_branch('explicit_empty_body_1'):
-                    event['body'] = b''
-
-                return event
-
-        chunk = self._body[: self._chunk_size]
-        self._body = self._body[self._chunk_size :] or None
-
-        if chunk:
-            event['body'] = bytes(chunk)
-        elif self._toggle_branch('explicit_empty_body_2'):
-            # NOTE(kgriffs): Since ASGI specifies that
-            #   'body' is optional, we toggle whether
-            #   or not to explicitly set it to b'' to ensure
-            #   the app handles both correctly.
-            event['body'] = b''
-
-        if self._body:
-            event['more_body'] = True
-        elif self._toggle_branch('set_more_body_false'):
-            # NOTE(kgriffs): The ASGI spec allows leaving off
-            #   the 'more_body' key when it would be set to
-            #   False, so toggle one of the approaches
-            #   to make sure the app handles both cases.
-            event['more_body'] = False
-
-        return event
 
     __call__ = emit
 
-    def _toggle_branch(self, name: str) -> bool:
-        self._branch_decider[name] = not self._branch_decider[name]
-        return self._branch_decider[name]
 
 
 class ASGIResponseEventCollector:
@@ -430,14 +335,14 @@ class ASGIWebSocketSimulator:
         """``True`` if the WebSocket connection has been accepted and the client is
         still connected, ``False`` otherwise.
         """  # noqa: D205
-        return self._state == _WebSocketState.ACCEPTED
+        pass
 
     @property
     def closed(self) -> bool:
         """``True`` if the WebSocket connection has been denied or closed by the app,
         or the client has disconnected.
         """  # noqa: D205
-        return self._state in {_WebSocketState.DENIED, _WebSocketState.CLOSED}
+        pass
 
     @property
     def close_code(self) -> int | None:
@@ -445,7 +350,7 @@ class ASGIWebSocketSimulator:
 
         Returns ``None`` if the connection is still open.
         """
-        return self._close_code
+        pass
 
     @property
     def close_reason(self) -> str | None:
@@ -453,12 +358,12 @@ class ASGIWebSocketSimulator:
 
         Returns ``None`` if the connection is still open.
         """
-        return self._close_reason
+        pass
 
     @property
     def subprotocol(self) -> str | None:
         """The subprotocol the app wishes to accept, or ``None`` if not specified."""
-        return self._accepted_subprotocol
+        pass
 
     @property
     def headers(self) -> list[tuple[bytes, bytes]] | None:
@@ -467,7 +372,7 @@ class ASGIWebSocketSimulator:
         the app when it accepted the WebSocket connection.
         This property resolves to ``None`` if the connection has not been accepted.
         """  # noqa: D205
-        return self._accepted_headers
+        pass
 
     async def wait_ready(self, timeout: int | None = None) -> None:
         """Wait until the connection has been accepted or denied.
@@ -480,21 +385,7 @@ class ASGIWebSocketSimulator:
             timeout (int): Number of seconds to wait before giving up and
                 raising an error (default: ``5``).
         """
-
-        timeout = timeout or self._DEFAULT_WAIT_READY_TIMEOUT
-
-        try:
-            await asyncio.wait_for(self._event_handshake_complete.wait(), timeout)
-        except asyncio.TimeoutError:
-            msg = (
-                f'Timed out after waiting {timeout} seconds for the WebSocket '
-                f'handshake to complete. Check the on_websocket responder and '
-                f'any middleware for any conditions that may be stalling the '
-                f'request flow.'
-            )
-            raise asyncio.TimeoutError(msg)
-
-        self._require_accepted()
+        pass
 
     # NOTE(kgriffs): This is a coroutine just in case we need it to be
     #   in a future code revision. It also makes it more consistent
@@ -555,16 +446,7 @@ class ASGIWebSocketSimulator:
         Arguments:
             payload (Union[bytes, bytearray, memoryview]): The binary data to send.
         """
-
-        # NOTE(kgriffs): We have to check ourselves because some ASGI
-        #   servers are not very strict which can lead to hard-to-debug
-        #   errors.
-        if not isinstance(payload, (bytes, bytearray, memoryview)):
-            raise TypeError('payload must be a byte string')
-
-        # NOTE(kgriffs): From the client's perspective, it was a send,
-        #   but the server will be expecting websocket.receive
-        await self._send(data=bytes(payload))
+        pass
 
     async def send_json(self, media: object) -> None:
         """Send a message to the app with a JSON-encoded payload.
@@ -572,9 +454,7 @@ class ASGIWebSocketSimulator:
         Arguments:
             media: A JSON-encodable object to send as a TEXT (0x01) payload.
         """
-
-        text = json.dumps(media)
-        await self.send_text(text)
+        pass
 
     async def send_msgpack(self, media: object) -> None:
         """Send a message to the app with a MessagePack-encoded payload.
@@ -582,9 +462,7 @@ class ASGIWebSocketSimulator:
         Arguments:
             media: A MessagePack-encodable object to send as a BINARY (0x02) payload.
         """
-
-        data = self._msgpack.packb(media, use_bin_type=True)
-        await self.send_data(data)
+        pass
 
     async def receive_text(self) -> str:
         """Receive a message from the app with a Unicode string payload.
@@ -592,23 +470,7 @@ class ASGIWebSocketSimulator:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
-
-        event = await self._receive()
-
-        # PERF(kgriffs): When we normally expect the key to be
-        #   present, this pattern is faster than get()
-        try:
-            text = event['text']
-        except KeyError:
-            text = None
-
-        # NOTE(kgriffs): Even if the key is present, it may be None
-        if text is None:
-            raise falcon_errors.PayloadTypeError(
-                'Expected TEXT payload but got BINARY instead'
-            )
-
-        return text  # type: ignore[no-any-return]
+        pass
 
     async def receive_data(self) -> bytes:
         """Receive a message from the app with a binary data payload.
@@ -616,23 +478,7 @@ class ASGIWebSocketSimulator:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
-
-        event = await self._receive()
-
-        # PERF(kgriffs): When we normally expect the key to be
-        #   present, EAFP is faster than get()
-        try:
-            data = event['bytes']
-        except KeyError:
-            data = None
-
-        # NOTE(kgriffs): Even if the key is present, it may be None
-        if data is None:
-            raise falcon_errors.PayloadTypeError(
-                'Expected BINARY payload but got TEXT instead'
-            )
-
-        return data  # type: ignore[no-any-return]
+        pass
 
     async def receive_json(self) -> Any:
         """Receive a message from the app with a JSON-encoded TEXT payload.
@@ -640,9 +486,7 @@ class ASGIWebSocketSimulator:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
-
-        text = await self.receive_text()
-        return json.loads(text)
+        pass
 
     async def receive_msgpack(self) -> Any:
         """Receive a message from the app with a MessagePack-encoded BINARY payload.
@@ -650,23 +494,8 @@ class ASGIWebSocketSimulator:
         Awaiting this coroutine will block until a message is available or
         the WebSocket is disconnected.
         """
+        pass
 
-        data = await self.receive_data()
-        return self._msgpack.unpackb(data, use_list=True, raw=False)
-
-    @property
-    def _msgpack(self) -> Any:
-        # NOTE(kgriffs): A property is used in lieu of referencing
-        #   the msgpack module directly, in order to bubble up the
-        #   import error in an obvious way, when the package has
-        #   not been installed.
-
-        if not self.__msgpack:
-            import msgpack
-
-            self.__msgpack = msgpack
-
-        return self.__msgpack
 
     def _require_accepted(self) -> None:
         if self._state == _WebSocketState.ACCEPTED:
@@ -722,116 +551,8 @@ class ASGIWebSocketSimulator:
         self._require_accepted()
         return self._collected_server_events.popleft()
 
-    async def _emit(self) -> AsgiEvent:
-        if self._state == _WebSocketState.CONNECT:
-            self._state = _WebSocketState.HANDSHAKE
-            return {'type': EventType.WS_CONNECT}
 
-        if self._state == _WebSocketState.HANDSHAKE:
-            # NOTE(kgriffs): We need to wait for the handshake to
-            #   complete, before proceeding.
-            await self._event_handshake_complete.wait()
 
-        while not self._collected_client_events:
-            await asyncio.sleep(0)
-            if self.closed:
-                return self._create_checked_disconnect()
-
-        return self._collected_client_events.popleft()
-
-    async def _collect(self, event: AsgiEvent) -> None:
-        assert event
-
-        if self._state == _WebSocketState.CONNECT:
-            raise falcon_errors.OperationNotAllowed(
-                'An ASGI application must receive the first websocket.connect '
-                'event before attempting to send any events.'
-            )
-
-        event_type = event['type']
-        if self._state == _WebSocketState.HANDSHAKE:
-            if event_type == EventType.WS_ACCEPT:
-                self._state = _WebSocketState.ACCEPTED
-                self._accepted_subprotocol = event.get('subprotocol')
-                self._accepted_headers = event.get('headers')
-                self._event_handshake_complete.set()
-
-                # NOTE(kgriffs): Yield to other pending tasks that may be
-                #   waiting on the completion of the handshake. This ensures
-                #   that the simulated client connection can enter its context
-                #   before the app logic continues and potentially closes the
-                #   connection from that side.
-                await asyncio.sleep(0)
-
-            elif event_type == EventType.WS_CLOSE:
-                self._state = _WebSocketState.DENIED
-
-                desired_code = event.get('code', WSCloseCode.NORMAL)
-                reason = event.get('reason', '')
-                if desired_code == WSCloseCode.SERVER_ERROR or (
-                    3000 <= desired_code < 4000
-                ):
-                    # NOTE(kgriffs): Pass this code through since it is a
-                    #   special code we have set in the framework to trigger
-                    #   different raised error types or to pass through a
-                    #   raised HTTPError status code.
-                    self._close_code = desired_code
-                    self._close_reason = reason
-                else:
-                    # NOTE(kgriffs): Force the close code to this since it is
-                    #   similar to what happens with a real web server (the HTTP
-                    #   connection is closed with a 403 and there is no websocket
-                    #   close code).
-                    self._close_code = WSCloseCode.FORBIDDEN
-                    self._close_reason = code_to_http_status(
-                        WSCloseCode.FORBIDDEN - 3000
-                    )
-
-                self._event_handshake_complete.set()
-
-            else:
-                raise falcon_errors.OperationNotAllowed(
-                    'An ASGI application must send either websocket.accept or '
-                    'websocket.close before sending any other event types (got '
-                    '{0})'.format(event_type)
-                )
-
-        elif self._state == _WebSocketState.ACCEPTED:
-            if event_type == EventType.WS_CLOSE:
-                self._state = _WebSocketState.CLOSED
-                self._close_code = event.get('code', WSCloseCode.NORMAL)
-                self._close_reason = event.get('reason', '')
-            else:
-                assert event_type == EventType.WS_SEND
-                self._collected_server_events.append(event)
-        else:
-            assert self.closed
-
-            # NOTE(vytas): Tweaked in Falcon 4.0: we now simulate ASGI
-            #   WebSocket protocol 2.4+, raising an instance of OSError upon
-            #   send if the client has already disconnected.
-            raise falcon_errors.WebSocketDisconnected(self._close_code)
-
-        # NOTE(kgriffs): Give whatever is waiting on the handshake or a
-        #   collected data/text event a chance to progress.
-        await asyncio.sleep(0)
-
-    def _create_checked_disconnect(self) -> AsgiEvent:
-        if self._disconnect_emitted:
-            raise falcon_errors.OperationNotAllowed(
-                'The websocket.disconnect event has already been emitted, '
-                'and so the app should not attempt to receive any more '
-                'events, since ASGI servers will likely block indefinitely '
-                'rather than re-emitting websocket.disconnect events.'
-            )
-
-        self._disconnect_emitted = True
-        response = {'type': EventType.WS_DISCONNECT, 'code': self._close_code}
-
-        if self._close_reason:
-            response['reason'] = self._close_reason
-
-        return response
 
 
 # get_encoding_from_headers() is Copyright 2016 Kenneth Reitz, and is
